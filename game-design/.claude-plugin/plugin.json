@@ -1,0 +1,21 @@
+{
+  "name": "game-design",
+  "description": "Game design toolkit for creating PRDs, scouting trends, and integrating games into projects. Includes skills for concept discovery, engagement systems, scoring mechanics, and full game integration workflows.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Himanshu Singh",
+    "url": "https://github.com/HimanshuSingh2308"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HimanshuSingh2308/claude-code-plugins"
+  },
+  "license": "MIT",
+  "keywords": [
+    "game-design",
+    "prd",
+    "game-development",
+    "trend-analysis",
+    "weekly-arcade"
+  ]
+}
