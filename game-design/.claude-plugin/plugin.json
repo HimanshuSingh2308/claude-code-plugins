@@ -6,10 +6,7 @@
     "name": "Himanshu Singh",
     "url": "https://github.com/HimanshuSingh2308"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/HimanshuSingh2308/claude-code-plugins"
-  },
+  "repository": "https://github.com/HimanshuSingh2308/claude-code-plugins",
   "license": "MIT",
   "keywords": [
     "game-design",
