@@ -1,7 +1,7 @@
 {
   "name": "game-design",
-  "description": "Game design toolkit for creating PRDs, scouting trends, and integrating games into projects. Includes skills for concept discovery, engagement systems, scoring mechanics, mobile UX, performance optimization, and specialized agents for QA testing and code review.",
-  "version": "1.1.0",
+  "description": "Complete game design toolkit with autonomous weekly release orchestration. Includes skills for trend scouting, PRD generation, game integration, mobile UX, performance optimization. Specialized agents for QA testing, code review, and security validation. The weekly-game-release command orchestrates the entire release workflow autonomously.",
+  "version": "2.1.0",
   "author": {
     "name": "Himanshu Singh",
     "url": "https://github.com/HimanshuSingh2308"
@@ -16,6 +16,10 @@
     "weekly-arcade",
     "mobile-games",
     "performance",
-    "qa-testing"
+    "qa-testing",
+    "orchestration",
+    "automation",
+    "ci-cd",
+    "workflow"
   ]
 }
