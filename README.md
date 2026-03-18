@@ -13,13 +13,13 @@ A plugin marketplace for Claude Code with custom plugins for game design, develo
 ### Install a Plugin
 
 ```bash
-/plugin install game-design@himanshu-plugins
+/plugin install game-design@hplugins
 ```
 
 ### Update Marketplace
 
 ```bash
-/plugin marketplace update himanshu-plugins
+/plugin marketplace update hplugins
 ```
 
 ## Available Plugins
@@ -91,7 +91,7 @@ Add this marketplace to your project's `.claude/settings.json`:
 ```json
 {
   "extraKnownMarketplaces": {
-    "himanshu-plugins": {
+    "hplugins": {
       "source": {
         "source": "github",
         "repo": "HimanshuSingh2308/claude-code-plugins"
@@ -99,7 +99,7 @@ Add this marketplace to your project's `.claude/settings.json`:
     }
   },
   "enabledPlugins": {
-    "game-design@himanshu-plugins": true
+    "game-design@hplugins": true
   }
 }
 ```

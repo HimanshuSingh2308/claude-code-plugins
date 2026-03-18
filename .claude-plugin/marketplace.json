@@ -1,5 +1,5 @@
 {
-  "name": "himanshu-plugins",
+  "name": "hplugins",
   "owner": {
     "name": "Himanshu Singh",
     "email": "hranjansingh@gmail.com"
@@ -24,6 +24,36 @@
       "keywords": ["game-design", "prd", "game-development", "trend-analysis", "weekly-arcade"],
       "category": "productivity",
       "tags": ["games", "design", "prd", "arcade"]
+    },
+    {
+      "name": "project-manager",
+      "source": "./project-manager",
+      "description": "Project session management toolkit for switching contexts, tracking recent projects, loading metadata, and scaffolding new projects from templates",
+      "version": "1.0.0",
+      "author": {
+        "name": "Himanshu Singh"
+      },
+      "homepage": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+      "repository": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+      "license": "MIT",
+      "keywords": ["project-management", "context-switching", "session", "workspace", "templates", "scaffolding"],
+      "category": "productivity",
+      "tags": ["projects", "workspace", "templates", "session"]
+    },
+    {
+      "name": "hplugins-tools",
+      "source": "./hplugins-tools",
+      "description": "Marketplace management tools: auto-update, sync plugins, check status, and manage configurations for hplugins",
+      "version": "1.0.0",
+      "author": {
+        "name": "Himanshu Singh"
+      },
+      "homepage": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+      "repository": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+      "license": "MIT",
+      "keywords": ["auto-update", "plugin-management", "sync", "marketplace", "tools"],
+      "category": "utilities",
+      "tags": ["tools", "updates", "sync", "management"]
     }
   ]
 }

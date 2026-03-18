@@ -1,0 +1,19 @@
+{
+  "name": "project-manager",
+  "description": "Project session management toolkit for switching contexts, tracking recent projects, loading metadata, and scaffolding new projects from templates. Provides commands: /load-project, /recent-projects, /project-info, /new-project",
+  "version": "1.0.0",
+  "author": {
+    "name": "Himanshu Singh",
+    "url": "https://github.com/HimanshuSingh2308"
+  },
+  "repository": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+  "license": "MIT",
+  "keywords": [
+    "project-management",
+    "context-switching",
+    "session",
+    "workspace",
+    "templates",
+    "scaffolding"
+  ]
+}
