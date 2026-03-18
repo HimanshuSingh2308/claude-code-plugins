@@ -17,22 +17,5 @@
     "mobile-games",
     "performance",
     "qa-testing"
-  ],
-  "agents": [
-    {
-      "name": "game-qa-tester",
-      "description": "QA testing agent that systematically tests browser games for bugs, edge cases, UX issues, mobile compatibility, and gameplay problems. Provides detailed bug reports with severity levels.",
-      "file": "../agents/game-qa-tester.md"
-    },
-    {
-      "name": "game-code-reviewer",
-      "description": "Code review agent specialized for browser games. Reviews code for architecture, performance, mobile compatibility, audio handling, animation patterns, and provides a quality score.",
-      "file": "../agents/game-code-reviewer.md"
-    },
-    {
-      "name": "leaderboard-validator",
-      "description": "Security validation agent for game leaderboards. Reviews score submission systems, anti-cheat patterns, API security, and provides recommendations for secure implementations.",
-      "file": "../agents/leaderboard-validator.md"
-    }
   ]
 }
