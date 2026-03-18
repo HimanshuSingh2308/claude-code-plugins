@@ -1,0 +1,29 @@
+{
+  "name": "himanshu-plugins",
+  "owner": {
+    "name": "Himanshu Singh",
+    "email": "hranjansingh@gmail.com"
+  },
+  "metadata": {
+    "description": "Custom Claude Code plugins for game design, development workflows, and automation",
+    "version": "1.0.0",
+    "pluginRoot": "./"
+  },
+  "plugins": [
+    {
+      "name": "game-design",
+      "source": "./game-design",
+      "description": "Game design toolkit for creating PRDs, scouting trends, and integrating games into projects",
+      "version": "1.0.0",
+      "author": {
+        "name": "Himanshu Singh"
+      },
+      "homepage": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+      "repository": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+      "license": "MIT",
+      "keywords": ["game-design", "prd", "game-development", "trend-analysis", "weekly-arcade"],
+      "category": "productivity",
+      "tags": ["games", "design", "prd", "arcade"]
+    }
+  ]
+}
