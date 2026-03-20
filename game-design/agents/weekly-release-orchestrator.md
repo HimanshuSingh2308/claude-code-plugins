@@ -18,7 +18,7 @@ You are the orchestration agent for the Weekly Game Release workflow. Your role 
 ### Phase Transitions
 
 ```
-INIT → SCOUT → DESIGN → BUILD → REVIEW → QA → SECURITY → PR → POST-RELEASE → COMPLETED
+INIT → SCOUT → DESIGN → BUILD → REVIEW → QA → VISUAL_QA → SECURITY → PR → POST-RELEASE → COMPLETED
                                    ↑         ↑
                                    └─────────┴──── (loops with max iterations)
 ```
@@ -69,6 +69,20 @@ interface WorkflowState {
     status: 'pending' | 'running' | 'completed' | 'failed';
     iterations: QAIteration[];
     deferredIssues: string[];    // GitHub issue URLs
+  };
+
+  visualQa: {
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    viewportsTested: string[];         // e.g. ['desktop-1920x1080', 'iphone-14-pro', 'iphone-se']
+    screenshots: string[];             // paths to captured screenshots
+    issues: VisualIssue[];
+    deferredIssues: string[];          // GitHub issue URLs
+    lighthouseScores?: {
+      performance: number;
+      accessibility: number;
+    };
+    fpsDesktop?: number;
+    fpsMobile?: number;
   };
 
   security: {
@@ -322,6 +336,84 @@ FOR iteration IN 1..MAX_ITERATIONS:
 
 ---
 
+### Phase 5b: Visual QA
+
+**Objective**: Verify the game renders correctly across desktop and mobile viewports using real browser testing.
+
+**Prerequisite**: Chrome DevTools MCP must be available. If unavailable, log warning and skip to SECURITY phase.
+
+**Execution**:
+```
+1. Log: "Starting VISUAL_QA phase"
+
+2. Start local dev server (if not already running):
+   npx serve apps/web/src -l 3000 &
+   GAME_URL = "http://localhost:3000/games/{gameSlug}/"
+
+3. Invoke agent: game-visual-tester
+   - Target URL: {GAME_URL}
+   - Test viewports: desktop (1920x1080), iPhone 14 Pro (393x852),
+     iPhone SE (375x667), Pixel 7 (412x915)
+   - Test flows: load → menu → gameplay → game over → restart
+
+4. Collect results:
+   screenshots = agent.screenshots
+   visual_issues = agent.issues
+
+5. Categorize visual issues:
+   critical_high = visual_issues.filter(b => b.severity IN ['CRITICAL', 'HIGH'])
+   medium_low = visual_issues.filter(b => b.severity IN ['MEDIUM', 'LOW'])
+
+6. Handle CRITICAL/HIGH visual issues:
+
+   IF critical_high.length > 0:
+     LOG: "Found {critical_high.length} CRITICAL/HIGH visual issues"
+
+     FOR issue IN critical_high:
+       FIX issue (scoped to new game folder, CSS/layout changes)
+       LOG: "Fixed [{issue.severity}]: {issue.title}"
+
+     git add && git commit -m "fix(game): Fix visual QA issues"
+
+     # Re-run visual test on fixed viewports only
+     RE-INVOKE agent: game-visual-tester
+       - Target URL: {GAME_URL}
+       - Test viewports: only those that had CRITICAL/HIGH issues
+
+     IF still has CRITICAL issues:
+       ABORT: "CRITICAL visual issues cannot be resolved"
+
+     IF still has HIGH issues:
+       LOG: "[WARN] {count} HIGH visual issues remain — creating GitHub issues"
+       # Defer remaining HIGH issues (don't block release for visual HIGH)
+
+7. Create GitHub issues for deferred visual bugs:
+   FOR bug IN medium_low + remaining_high:
+     issue = gh issue create \
+       --title "[{gameSlug}][Visual] {bug.title}" \
+       --body "{bug.description}\n\nViewport: {bug.viewport}\nSeverity: {bug.severity}"
+
+     visualQa.deferredIssues.push(issue.url)
+     LOG: "Created deferred visual issue: {issue.url}"
+
+8. Collect performance metrics:
+   visualQa.lighthouseScores = agent.lighthouseScores
+   visualQa.fpsDesktop = agent.fpsDesktop
+   visualQa.fpsMobile = agent.fpsMobile
+
+9. Stop local dev server
+
+10. Save to state: visualQa.*
+11. TRANSITION to SECURITY phase
+```
+
+**Pass Criteria**:
+- Zero CRITICAL visual issues remaining
+- Lighthouse accessibility score >= 70
+- Game playable (visually) on all tested viewports
+
+---
+
 ### Phase 6: Security Validation
 
 **Objective**: Ensure leaderboard security with no HIGH-risk vulnerabilities.
@@ -407,6 +499,9 @@ FOR iteration IN 1..MAX_ITERATIONS:
    ## Quality Metrics
    - Code Review Score: {review.finalScore}/30
    - QA Iterations: {qa.iterations.length}
+   - Visual QA: {visualQa.viewportsTested.length} viewports tested
+   - Lighthouse: Perf {visualQa.lighthouseScores.performance}/100, A11y {visualQa.lighthouseScores.accessibility}/100
+   - FPS: Desktop {visualQa.fpsDesktop}, Mobile {visualQa.fpsMobile}
    - Security: {security.assessment.summary}
 
    ## Deferred Issues
@@ -487,9 +582,13 @@ FOR iteration IN 1..MAX_ITERATIONS:
    - Files Added: {build.filesCreated.length}
    - Code Review Score: {review.finalScore}/30
    - QA Iterations: {qa.iterations.length}
+   - Visual QA Viewports: {visualQa.viewportsTested.length}
+   - Lighthouse Performance: {visualQa.lighthouseScores.performance}/100
+   - Lighthouse Accessibility: {visualQa.lighthouseScores.accessibility}/100
+   - FPS: Desktop {visualQa.fpsDesktop} / Mobile {visualQa.fpsMobile}
    - Bugs Found: {totalBugsFound}
    - Bugs Fixed: {bugsFixed}
-   - Bugs Deferred: {qa.deferredIssues.length}
+   - Bugs Deferred: {qa.deferredIssues.length + visualQa.deferredIssues.length}
 
    ## Workflow Metrics
    - Total Duration: {calculateDuration()}
@@ -516,6 +615,13 @@ FOR iteration IN 1..MAX_ITERATIONS:
      bugsFixed: count_fixed_bugs(),
      bugsDeferred: qa.deferredIssues.length,
      finalReviewScore: review.finalScore,
+     visualViewportsTested: visualQa.viewportsTested.length,
+     visualIssuesFound: visualQa.issues.length,
+     visualIssuesDeferred: visualQa.deferredIssues.length,
+     lighthousePerformance: visualQa.lighthouseScores?.performance,
+     lighthouseAccessibility: visualQa.lighthouseScores?.accessibility,
+     fpsDesktop: visualQa.fpsDesktop,
+     fpsMobile: visualQa.fpsMobile,
      securityRisksAccepted: security.acceptedRisks.length
    }
 
@@ -540,6 +646,9 @@ FOR iteration IN 1..MAX_ITERATIONS:
    | Review Score | {review.finalScore}/30 |
    | Review Iterations | {review.iterations.length} |
    | QA Iterations | {qa.iterations.length} |
+   | Visual QA Viewports | {visualQa.viewportsTested.length} |
+   | Lighthouse Perf / A11y | {visualQa.lighthouseScores.performance} / {visualQa.lighthouseScores.accessibility} |
+   | FPS (Desktop / Mobile) | {visualQa.fpsDesktop} / {visualQa.fpsMobile} |
    | Bugs Fixed | {metrics.bugsFixed} |
    | Bugs Deferred | {metrics.bugsDeferred} |
 
