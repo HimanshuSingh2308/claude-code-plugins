@@ -204,13 +204,16 @@ All commands enforce safety rules:
 - `/game-design:game-trend-scout` - Research trending games
 - `/game-design:add-new-game` - Integrate games into monorepo
 
-### Knowledge Skills
-- `/game-design:mobile-game-ux` - Mobile UX patterns
-- `/game-design:animation-patterns` - Animation best practices
-- `/game-design:sound-design` - Audio implementation
-- `/game-design:performance-tuning` - Optimization patterns
-- `/game-design:game-balancing` - Balance tuning
-- `/game-design:orchestrator-guardrails` - Safety rules
+### Knowledge Skills (auto-applied)
+- `/game-design:level-design` - **NEW** Zone layout, camera perspective, NPC pathfinding, spatial progression
+- `/game-design:game-theory` - **NEW** Flow theory, player psychology, cognitive load, motivation
+- `/game-design:economy-design` - **NEW** Currency systems, upgrade pricing, faucets/sinks, inflation
+- `/game-design:mobile-game-ux` - Mobile UX patterns, touch targets, gesture controls
+- `/game-design:animation-patterns` - Animation best practices, CSS/JS patterns
+- `/game-design:sound-design` - Web Audio API implementation, procedural audio
+- `/game-design:performance-tuning` - 60fps optimization, memory management
+- `/game-design:game-balancing` - Difficulty curves, scoring formulas, XP progression
+- `/game-design:orchestrator-guardrails` - Safety rules for automated workflows
 
 ---
 

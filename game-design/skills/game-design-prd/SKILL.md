@@ -181,49 +181,69 @@ One paragraph: what the game is, who it's for, why it's fun, what makes it uniqu
 - Win/Lose Conditions
 - Power-ups / Special Mechanics
 
-## 6. Scoring System
+## 6. Level & World Design
+- Camera perspective (side-view, top-down, isometric)
+- Zone layout diagram (action zone, upgrade zone, unlock zones)
+- How zones unlock and evolve visually with progression
+- NPC roles and positioning (player character, workers, customers, special NPCs)
+- Customer/NPC pathfinding (spawn point → queue/destination → exit)
+- Visual depth approach (layers, shadows, ambient elements)
+- Mobile spatial budget (where things go in 480px)
+
+## 7. Game Economy
+- Currency types and their purpose
+- Faucets: earning sources with rates per session
+- Sinks: spending options with cost formulas
+- Upgrade pricing formula (linear/polynomial/exponential)
+- Revenue projection table: earnings vs costs by day/session
+- Inflation control (diminishing returns, scaling costs)
+- Key milestones: first upgrade, mid-game unlock, endgame
+
+## 8. Scoring System
 - Scoring formula / method
 - Multipliers and combos
 - Score display rules
 - Post-game summary
 
-## 7. Progression & Engagement Systems
+## 9. Progression & Engagement Systems
 - Leveling / XP
 - Unlockables
 - Daily/Weekly systems
 - Retention hooks
+- Player psychology: flow channel, cognitive load, reward cascading
 
-## 8. Leaderboards
+## 10. Leaderboards
 - Types and reset schedules
 - Display logic
 - Anti-frustration rules
 
-## 9. Multiplayer (if applicable)
+## 11. Multiplayer (if applicable)
 - Mode type
 - Matchmaking
 - Session flow
 - Fallback behavior
 
-## 10. Monetization (optional)
+## 12. Monetization (optional)
 - Model: F2P / Premium / IAP
 - What's monetized (cosmetics, boosts, levels)
 - What's NEVER paywalled (core fun loop should always be free)
 
-## 11. Art & Audio Direction
+## 13. Art & Audio Direction
 - Visual style (reference 2–3 games)
-- Color palette mood
+- Color palette with hex codes
 - Audio feel (chiptune? ambient? hype?)
+- Environmental storytelling (what the space communicates without words)
 
-## 12. Technical Requirements
+## 14. Technical Requirements
 - Platform targets
 - Recommended engine (Unity, Godot, Phaser, etc.)
 - Backend needs (leaderboard API, matchmaking, auth)
 - MVP scope vs full scope
 
-## 13. MVP Feature List
+## 15. MVP Feature List
 Prioritized list: P0 (launch), P1 (week 2), P2 (month 2)
 
-## 14. Success Metrics
+## 16. Success Metrics
 - D1 / D7 / D30 retention targets
 - Session length target
 - Target score variance (good score spread across player skill levels)
@@ -261,7 +281,15 @@ Ask these during your first playtest session:
 - `references/game-genres.md` — Genre-specific design patterns and conventions
 - `references/engagement-patterns.md` — Deep dive on retention loops, psychological hooks
 - `references/tech-stack-options.md` — Engine/backend recommendations by platform and budget
+
+## Related Skills (auto-applied)
+
+- **`level-design`** — Zone layout, camera perspective, NPC pathfinding, spatial progression, environment evolution. Consult when designing the game world section of the PRD.
+- **`game-theory`** — Flow theory, player psychology, cognitive load, motivation frameworks, peak-end rule. Consult when designing difficulty curves, reward systems, and engagement hooks.
+- **`economy-design`** — Currency systems, upgrade pricing formulas, faucets/sinks, revenue projections, inflation control. Consult when designing the upgrade shop and economy section of the PRD.
+- **`game-balancing`** — Difficulty curves, scoring formulas, XP progression, combo systems. Consult when tuning numbers.
+
 ---
 
-Read the relevant reference file when the user's concept needs genre-specific guidance or when
-they ask about technical implementation.
+Read the relevant reference file or related skill when the user's concept needs genre-specific
+guidance, spatial design, economy balancing, or psychological framework application.
