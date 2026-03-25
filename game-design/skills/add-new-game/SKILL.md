@@ -532,6 +532,10 @@ function onGameEnd(won, scoreValue, extras = {}) {
 **Critical:** path is `../../js/` — two levels up from `games/<slug>/`. One level
 up (`../js/`) will 404.
 
+**Do NOT add Firebase SDK script tags** (`firebase-app-compat.js`, `firebase-auth-compat.js`).
+`auth.js` dynamically loads the Firebase SDK automatically. Adding them manually causes
+duplicate initialization and inconsistency.
+
 ---
 
 ### 2.11 Required back link (anywhere in `<body>`)
