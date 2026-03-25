@@ -227,6 +227,9 @@ All commands enforce safety rules:
 |-------|---------|--------|
 | `game-code-reviewer` | Code quality analysis | Score /30 + issues |
 | `game-qa-tester` | Bug and UX testing | Bug reports by severity |
+| `game-visual-tester` | Screenshot-based visual QA via Chrome DevTools | Visual bug reports |
+| `game-accessibility-auditor` | **NEW** Lighthouse + manual a11y audit | Score /65 + issues |
+| `game-economy-validator` | **NEW** Economy math, pricing, dead zones | Balance report + tuning recs |
 | `leaderboard-validator` | Security validation | Risk assessment |
 | `weekly-release-orchestrator` | Workflow orchestration | Release artifacts |
 

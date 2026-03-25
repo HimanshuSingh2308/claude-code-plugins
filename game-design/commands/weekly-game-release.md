@@ -16,14 +16,22 @@ This command orchestrates the entire weekly game release by coordinating:
 | Component | Type | Purpose |
 |-----------|------|---------|
 | `game-trend-scout` | Skill | Research trends, rank game concepts |
-| `game-design-prd` | Skill | Generate complete PRD |
+| `game-design-prd` | Skill | Generate complete PRD (16-section template) |
 | `add-new-game` | Skill | Implement game in monorepo |
 | `mobile-game-ux` | Knowledge | Mobile UX patterns |
 | `animation-patterns` | Knowledge | Animation best practices |
 | `sound-design` | Knowledge | Audio implementation |
 | `performance-tuning` | Knowledge | Optimization patterns |
+| `level-design` | Knowledge | Zone layout, NPC paths, spatial design |
+| `game-theory` | Knowledge | Flow theory, player psychology |
+| `economy-design` | Knowledge | Currency balance, upgrade pricing |
+| `css-game-art` | Knowledge | CSS character/environment art |
+| `game-accessibility` | Knowledge | Inclusive design patterns |
 | `game-code-reviewer` | Agent | Code quality scoring |
 | `game-qa-tester` | Agent | Bug detection |
+| `game-visual-tester` | Agent | Screenshot-based visual QA |
+| `game-accessibility-auditor` | Agent | Accessibility scoring (target: 45/65+) |
+| `game-economy-validator` | Agent | Economy balance validation |
 | `leaderboard-validator` | Agent | Security assessment |
 | GitHub MCP | External | PRs, issues, merging |
 
@@ -206,7 +214,61 @@ MEDIUM-risk issues:
   - Include in PR description
 ```
 
-### Phase 7: PR & Merge
+### Phase 7: Economy Validation
+
+```yaml
+Agent: game-economy-validator
+
+Checks:
+  - Revenue projection (no upgrades) for 20 sessions
+  - Revenue projection (with optimal upgrades)
+  - Dead zone detection (can't afford anything for 3+ sessions)
+  - Upgrade payback analysis (target: 1.5-4 sessions)
+  - Dominant upgrade check
+  - Score spread ratio (target: 10-30x)
+  - Server-side game config exists
+
+CRITICAL issues (dead zones, broken math):
+  - Fix immediately
+  - Re-validate
+
+HIGH issues (dominant upgrades, grindy pacing):
+  - Fix if straightforward
+  - Document as known issue if complex
+
+MEDIUM issues:
+  - Document for post-launch tuning
+```
+
+### Phase 8: Accessibility Audit
+
+```yaml
+Agent: game-accessibility-auditor
+
+Checks:
+  - Lighthouse accessibility score (target: 90+)
+  - Color contrast (WCAG AA)
+  - prefers-reduced-motion support
+  - Touch targets >= 44px
+  - Keyboard navigation
+  - Screen reader ARIA labels
+  - Non-color state indicators
+
+Target score: 45/65+
+
+CRITICAL issues (no reduced-motion, contrast failures):
+  - Fix immediately
+  - Re-audit
+
+HIGH issues (missing ARIA, small touch targets):
+  - Fix if straightforward
+  - Create GitHub issue if complex
+
+MEDIUM/LOW issues:
+  - Create GitHub issues for future improvement
+```
+
+### Phase 9: PR & Merge
 
 ```yaml
 GitHub Operations:
@@ -219,7 +281,7 @@ GitHub Operations:
 Abort if: CI checks fail after fix attempt
 ```
 
-### Phase 8: Post-Release
+### Phase 10: Post-Release
 
 ```yaml
 Actions:
