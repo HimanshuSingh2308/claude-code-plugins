@@ -213,6 +213,10 @@ All commands enforce safety rules:
 - `/game-design:sound-design` - Web Audio API implementation, procedural audio
 - `/game-design:performance-tuning` - 60fps optimization, memory management
 - `/game-design:game-balancing` - Difficulty curves, scoring formulas, XP progression
+- `/game-design:css-game-art` - **NEW** CSS-only characters, environments, effects, color palettes
+- `/game-design:playtesting` - **NEW** Three-pass testing, feel checklist, iteration prioritization
+- `/game-design:game-accessibility` - **NEW** Color contrast, reduced motion, cognitive load, inclusive design
+- `/game-design:post-launch` - **NEW** Improvement funnel, signal detection, what to fix/add/cut
 - `/game-design:orchestrator-guardrails` - Safety rules for automated workflows
 
 ---
