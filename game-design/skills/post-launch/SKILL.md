@@ -172,7 +172,7 @@ After each post-launch iteration:
 [ ] Achievements still trigger correctly
 [ ] localStorage save/load still works
 [ ] No new console errors
-[ ] Visual QA screenshots taken before/after
+[ ] Visual QA via `game-visual-tester` agent — screenshots before/after on desktop + mobile
 [ ] Change committed with descriptive message
 [ ] Deployed and verified on production
 ```

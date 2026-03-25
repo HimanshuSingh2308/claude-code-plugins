@@ -288,6 +288,7 @@ Ask these during your first playtest session:
 - **`game-theory`** — Flow theory, player psychology, cognitive load, motivation frameworks, peak-end rule. Consult when designing difficulty curves, reward systems, and engagement hooks.
 - **`economy-design`** — Currency systems, upgrade pricing formulas, faucets/sinks, revenue projections, inflation control. Consult when designing the upgrade shop and economy section of the PRD.
 - **`game-balancing`** — Difficulty curves, scoring formulas, XP progression, combo systems. Consult when tuning numbers.
+- **`playtesting`** — Structured self-testing methodology, feel/pacing evaluation, iteration priorities. Consult when writing the Fun Test Checklist and success metrics.
 
 ---
 

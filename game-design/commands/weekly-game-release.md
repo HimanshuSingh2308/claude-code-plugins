@@ -25,8 +25,11 @@ This command orchestrates the entire weekly game release by coordinating:
 | `level-design` | Knowledge | Zone layout, NPC paths, spatial design |
 | `game-theory` | Knowledge | Flow theory, player psychology |
 | `economy-design` | Knowledge | Currency balance, upgrade pricing |
+| `game-balancing` | Knowledge | Difficulty curves, scoring formulas, XP tuning |
 | `css-game-art` | Knowledge | CSS character/environment art |
 | `game-accessibility` | Knowledge | Inclusive design patterns |
+| `playtesting` | Knowledge | Self-testing methodology, feel/pacing evaluation |
+| `post-launch` | Knowledge | Post-release monitoring, iteration priorities |
 | `game-code-reviewer` | Agent | Code quality scoring |
 | `game-qa-tester` | Agent | Bug detection |
 | `game-visual-tester` | Agent | Screenshot-based visual QA |
@@ -176,7 +179,51 @@ Per Iteration:
   4. If score < 15 after 3 iterations: abort
 ```
 
-### Phase 5: QA Loop
+### Phase 5: Visual QA
+
+```yaml
+Agent: game-visual-tester
+Runs: After code review, before functional QA
+
+Steps:
+  1. Navigate to game on local dev server or file path
+  2. Desktop testing (1920x1080):
+     - Screenshot initial load, menu, gameplay, game over
+     - Verify layout, text readability, no overflow
+  3. Mobile testing (iPhone 14 Pro, iPhone SE, Pixel 7):
+     - Emulate each device
+     - Screenshot all game states
+     - Verify touch targets >= 44px, no horizontal scroll
+     - Check safe area / notch handling
+  4. Responsive breakpoints (320, 375, 414, 768, 1024, 1920):
+     - Screenshot each width
+     - Flag layout jumps, overlapping elements, truncated text
+  5. Console & network check:
+     - list_console_messages — flag errors
+     - list_network_requests — flag 404s
+  6. Performance snapshot:
+     - Lighthouse performance + accessibility scores
+     - FPS during gameplay (target: 60 desktop, 30+ mobile)
+
+CRITICAL issues (game unplayable at any viewport):
+  - Fix immediately
+  - Re-test that viewport
+
+HIGH issues (major visual breakage):
+  - Fix immediately
+  - Commit and re-test
+
+MEDIUM/LOW issues:
+  - Create GitHub issue (deferred)
+  - Label: visual, {severity}, {viewport}
+
+Exit when: No CRITICAL/HIGH visual issues remain
+Abort when: CRITICAL/HIGH persist after 2 iterations
+
+Output: Visual QA report with screenshot inventory, included in PR description
+```
+
+### Phase 6: QA Loop
 
 ```yaml
 Agent: game-qa-tester
@@ -196,9 +243,15 @@ Per Iteration:
 
   Exit when: No CRITICAL/HIGH bugs remain
   Abort when: CRITICAL/HIGH persist after 3 iterations
+
+Knowledge: playtesting
+  - After QA bugs are resolved, run a structured self-playtest
+  - Evaluate: first 30s clarity, "one more round" feel, skill expression moments
+  - Check score fairness and curiosity signals
+  - Log feel/pacing issues as MEDIUM GitHub issues for post-launch tuning
 ```
 
-### Phase 6: Security Validation
+### Phase 7: Security Validation
 
 ```yaml
 Agent: leaderboard-validator
@@ -214,7 +267,7 @@ MEDIUM-risk issues:
   - Include in PR description
 ```
 
-### Phase 7: Economy Validation
+### Phase 8: Economy Validation
 
 ```yaml
 Agent: game-economy-validator
@@ -240,7 +293,7 @@ MEDIUM issues:
   - Document for post-launch tuning
 ```
 
-### Phase 8: Accessibility Audit
+### Phase 9: Accessibility Audit
 
 ```yaml
 Agent: game-accessibility-auditor
@@ -268,7 +321,7 @@ MEDIUM/LOW issues:
   - Create GitHub issues for future improvement
 ```
 
-### Phase 9: PR & Merge
+### Phase 10: PR & Merge
 
 ```yaml
 GitHub Operations:
@@ -281,7 +334,7 @@ GitHub Operations:
 Abort if: CI checks fail after fix attempt
 ```
 
-### Phase 10: Post-Release
+### Phase 11: Post-Release
 
 ```yaml
 Actions:
@@ -290,8 +343,17 @@ Actions:
   - Calculate workflow metrics
   - Save final state
 
+Knowledge: post-launch
+  - Generate post-release monitoring plan:
+    - What metrics to watch (session length, score spread, bounce rate)
+    - What to improve first based on QA/playtest findings
+    - What to cut if engagement is low
+    - A/B test candidates from deferred issues
+  - Include monitoring plan in release notes
+
 Output:
   - Release notes: ~/Documents/weekly-games/releases/{slug}-release-notes.md
+  - Monitoring plan: included in release notes under "Post-Launch" section
   - Workflow state: ~/Documents/weekly-games/workflows/{id}.json
 ```
 
@@ -332,9 +394,13 @@ When using `--dry-run`, the orchestrator simulates all phases and outputs:
 | Design | Simulated | PRD with 14 sections |
 | Build | Simulated | 3 files to create, 3 to modify |
 | Review | Estimated | Initial review pending |
+| Visual QA | Estimated | Desktop + mobile screenshots pending |
 | QA | Estimated | Testing pending |
 | Security | Estimated | Validation pending |
+| Economy | Estimated | Balance validation pending |
+| Accessibility | Estimated | Audit pending |
 | PR | Planned | Would create PR |
+| Post-Release | Planned | Release notes + monitoring plan |
 
 ### Files to Create
 - apps/web/src/games/emoji-match/index.html
