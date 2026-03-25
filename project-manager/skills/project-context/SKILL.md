@@ -184,8 +184,32 @@ Custom templates stored at `~/.claude/project-templates/`:
 Project context is maintained through:
 
 1. **Current Working Directory** - Primary context indicator
-2. **Project Registry** - Metadata and history
-3. **Session Memory** - Conversation context (managed by Claude)
+2. **Project Registry** - Metadata and history (`~/.claude/project-registry.json`)
+3. **Knowledge Cache** - Persistent project knowledge (`~/.claude/projects/{path}/memory/project_knowledge.md`)
+4. **Session Memory** - Conversation context (managed by Claude)
+
+## Knowledge Cache System
+
+Each project gets a knowledge file saved to the Claude memory system:
+
+**Location**: `~/.claude/projects/{sanitized-path}/memory/project_knowledge.md`
+
+**Contents**: Tech stack, directory structure, key scripts, CLAUDE.md summary, dependencies, CI/CD, custom commands, conventions.
+
+**Cache rules**:
+- Created on first `/load-project` (full scan)
+- Reused on subsequent `/load-project` calls (instant load)
+- Expires after 7 days (auto-refreshed on next load)
+- Manually refreshed via `/refresh-project`
+- Deep refresh via `/refresh-project --deep`
+
+**Cache validation on load**:
+1. Check file exists and `scannedAt` is within 7 days
+2. Quick git check (branch, latest commit) to freshen context
+3. Skip full scan, present cached summary
+
+**Sanitized path format**: Replace `/` with `-`, remove leading `-`
+- `/Users/hsingh1/Documents/weekly-arcade` → `-Users-hsingh1-Documents-weekly-arcade`
 
 ## Error Recovery
 
@@ -203,7 +227,8 @@ Common issues and solutions:
 
 This skill integrates with:
 
-- `/load-project` - Main command for switching context
+- `/load-project` - Main command for switching context (uses knowledge cache)
+- `/refresh-project` - Force re-scan and update knowledge cache
 - `/recent-projects` - List and navigate history
 - `/project-info` - Display current project details
 - `/new-project` - Create from templates

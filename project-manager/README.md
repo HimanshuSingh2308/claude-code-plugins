@@ -6,17 +6,48 @@ A Claude Code plugin for managing project sessions, switching contexts, tracking
 
 | Command | Description |
 |---------|-------------|
-| `/load-project <path>` | Switch working context to a project |
+| `/load-project <path>` | Switch working context to a project (uses cache if available) |
+| `/refresh-project` | Force re-scan current project and update knowledge cache |
 | `/recent-projects` | List and navigate to recent projects |
 | `/project-info` | Display metadata about current project |
 | `/new-project <name>` | Create a new project from a template |
 
 ## Features
 
+### Smart Project Loading with Knowledge Cache
+
+When you load a project, the plugin saves a knowledge snapshot to memory so subsequent loads are **instant** — no re-reading dozens of files.
+
+**First load**: Full scan → reads CLAUDE.md, package.json, configs, structure → saves to knowledge cache
+**Subsequent loads**: Reads cache → quick git status check → ready in seconds
+
+Knowledge cache is stored at:
+```
+~/.claude/projects/{sanitized-path}/memory/project_knowledge.md
+```
+
+Cache expires after 7 days and is automatically refreshed.
+
+### Refresh Project
+
+Use `/refresh-project` when the project has changed significantly:
+
+```bash
+# Quick refresh — git status, changed files, updated scripts
+/refresh-project
+
+# Deep refresh — full re-scan of everything
+/refresh-project --deep
+```
+
+The refresh shows a diff of what changed since last scan.
+
 ### Context Switching
 Quickly switch between different project directories. When you load a project, the plugin:
+- Checks for cached knowledge first (instant load)
 - Detects the tech stack (language, framework, build tools)
 - Reads project configuration (CLAUDE.md, package.json, etc.)
+- Saves project knowledge for future sessions
 - Updates the project registry for quick access later
 - Changes to the project directory
 
@@ -42,6 +73,21 @@ Scaffold new projects quickly:
 - Custom templates support
 - Automatic CLAUDE.md generation
 - Git initialization and initial commit
+
+## Knowledge Cache Contents
+
+The knowledge file stores:
+
+| Section | Contents |
+|---------|----------|
+| **Structure** | Top-level directory layout with purpose of each dir |
+| **Tech Stack** | Runtime, framework, package manager, build tool, testing, DB, deploy |
+| **Key Scripts** | Available npm/make scripts with descriptions |
+| **CLAUDE.md Summary** | Condensed rules, patterns, and API conventions |
+| **Dependencies** | Key production and dev dependencies |
+| **CI/CD** | GitHub Actions workflows, deploy process |
+| **Custom Commands** | Available /commands from .claude/commands/ |
+| **Conventions** | Coding patterns, naming conventions, file organization |
 
 ## Built-in Templates
 
@@ -70,38 +116,29 @@ Projects are tracked in `~/.claude/project-registry.json`:
   "projects": {
     "/path/to/project": {
       "name": "project-name",
-      "lastAccessed": "2026-03-18T12:00:00Z",
+      "lastAccessed": "2026-03-25T12:00:00Z",
       "techStack": ["node", "typescript", "react"],
-      "hasClaudeConfig": true
+      "hasClaudeConfig": true,
+      "hasKnowledgeCache": true
     }
   }
 }
 ```
 
-## Custom Templates
-
-Create custom templates at `~/.claude/project-templates/`:
-
-```
-~/.claude/project-templates/my-template/
-├── template.json       # Template configuration
-├── files/              # Files to copy
-└── README.md           # Template documentation
-```
-
-## Installation
-
-This plugin is part of the `hplugins` marketplace. To use it:
-
-1. Ensure the marketplace is installed
-2. Run `/wiser-sync` to update plugins (if using wiser-tools)
-3. Commands will be available immediately
-
 ## Usage Examples
 
 ```bash
-# Load a project
+# Load a project (uses cache if available)
 /load-project ~/code/my-app
+
+# Load by name (from registry)
+/load-project weekly-arcade
+
+# Refresh after major changes
+/refresh-project
+
+# Deep refresh (full re-scan)
+/refresh-project --deep
 
 # See recent projects
 /recent-projects

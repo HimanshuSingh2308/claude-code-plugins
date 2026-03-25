@@ -1,7 +1,7 @@
 {
   "name": "project-manager",
-  "description": "Project session management toolkit for switching contexts, tracking recent projects, loading metadata, and scaffolding new projects from templates. Provides commands: /load-project, /recent-projects, /project-info, /new-project",
-  "version": "1.0.0",
+  "description": "Project session management toolkit for switching contexts, tracking recent projects, loading metadata, and scaffolding new projects from templates. Provides commands: /load-project, /recent-projects, /project-info, /new-project, /refresh-project",
+  "version": "1.1.0",
   "author": {
     "name": "Himanshu Singh",
     "url": "https://github.com/HimanshuSingh2308"
