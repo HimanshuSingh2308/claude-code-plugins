@@ -26,16 +26,18 @@ It covers every file that must change, the exact patterns to follow, and the ord
 apps/web/src/
   index.html                   ← Landing page (6 changes needed)
   sitemap.xml                  ← SEO sitemap (1 entry to add)
-  leaderboard/index.html       ← Leaderboard page GAMES array (1 entry)
+  leaderboard/index.html       ← Leaderboard page (auto-populated from API catalog)
   games/
     <game-slug>/
       index.html               ← The entire game (create this)
   js/
     api-client.js              ← Shared API client (DO NOT MODIFY)
-    auth.js                    ← Auth manager (DO NOT MODIFY)
+    auth.js                    ← Auth manager + auth nudge (DO NOT MODIFY)
+    game-cloud.js              ← Shared auth/score/cloud library (DO NOT MODIFY)
 packages/shared/src/
   lib/types/leaderboard.types.ts   ← SubmitScoreDto shape
   lib/constants/scoring.ts         ← SCORING constants, helpers
+  lib/constants/game-registry.ts   ← GAME_REGISTRY — single source of truth for all games (ADD ENTRY)
 ```
 
 ---
@@ -101,7 +103,7 @@ The reference file contains the canonical implementations for:
 - **2.4 Achievement System** — `ACHIEVEMENTS` object + `checkAchievements(gameData)`
 - **2.5 Visual Feedback** — `showAchievementToast()`, `showConfetti()`, `showScorePop()`, `showLevelUpEffect()`, `showNewAchievements()`
 - **2.6 XP & Levels** — `addXP(amount)` with level-up detection
-- **2.7 Score Submission** — `submitScoreToCloud(scoreValue, extras)`
+- **2.7 Score Submission** — via `window.gameCloud.submitScore()` or `submitOrQueue()`
 
 **Customization points** (do these AFTER copying from reference):
 - Sound: Add game-specific cases (e.g. `'harvest'`, `'attack'`) to the switch statement
@@ -114,17 +116,84 @@ the GAMES array and sitemap. One mismatch = scores go to a ghost leaderboard.
 
 ---
 
-### 2.8 Auth integration
+### 2.8 Auth + Cloud integration (via game-cloud.js)
+
+All auth state, score submission, cloud save/load, guest score queuing, and achievements
+are handled by the shared `game-cloud.js` library. **Do NOT write custom auth polling,
+submitScore guards, or cloud state boilerplate** — use the `gameCloud` API instead.
 
 ```javascript
-// ── AUTH ───────────────────────────────────────────────────
+// ── AUTH & CLOUD (via shared game-cloud.js) ─────────────────
 let currentUser = null;
+let cloudState = null;
 
-window.addEventListener('authStateChanged', (e) => {
-  currentUser = e.detail?.user ?? null;
-  // Update UI here: show username, enable leaderboard features, etc.
-});
+function initAuth() {
+  window.gameCloud.initAuth({
+    authBtnId: 'authBtn',        // ID of the sign-in button (or null for custom UI)
+    signInStyle: 'name',          // 'name' shows first name, 'button' shows Sign In/Profile
+    onSignIn: async (user) => {
+      currentUser = user;
+      cloudState = await window.gameCloud.loadState('GAME_SLUG');
+      // Merge cloud state with local (e.g. sync high score)
+      if (cloudState?.additionalData?.highScore > localHighScore) {
+        localHighScore = cloudState.additionalData.highScore;
+        localStorage.setItem('GAME_SLUG-high-score', localHighScore);
+      }
+      // If this game uses guest score queuing:
+      await window.gameCloud.syncGuestScores('GAME_SLUG');
+    },
+    onSignOut: () => { currentUser = null; cloudState = null; }
+  });
+}
+
+// Score submission — gameCloud handles auth guard + guest nudge
+async function submitScore() {
+  // Option A: Simple submit (skips silently for guests, shows nudge)
+  await window.gameCloud.submitScore('GAME_SLUG', {
+    score: score,
+    level: level,
+    timeMs: Date.now() - gameStartTime,
+    metadata: { /* game-specific */ }
+  });
+
+  // Option B: Submit or queue (for games that store guest scores locally)
+  await window.gameCloud.submitOrQueue('GAME_SLUG', scoreData, { silent: false });
+}
+
+// Cloud state — gameCloud handles auth guard + error handling
+async function saveCloudState(won = false) {
+  const prev = cloudState || {};
+  const newState = {
+    currentLevel: level,
+    currentStreak: 0,
+    bestStreak: Math.max(prev.bestStreak || 0, level),
+    gamesPlayed: (prev.gamesPlayed || 0) + 1,
+    gamesWon: (prev.gamesWon || 0) + (won ? 1 : 0),
+    lastPlayedDate: new Date().toISOString().split('T')[0],
+    additionalData: { highScore, lastScore: score }
+  };
+  await window.gameCloud.saveState('GAME_SLUG', newState);
+  cloudState = newState;
+
+  // Achievements — gameCloud handles auth guard + silent fail
+  if (newState.gamesPlayed === 1) window.gameCloud.unlockAchievement('first_game', 'GAME_SLUG');
+  if (newState.gamesWon >= 10) window.gameCloud.unlockAchievement('ten_wins', 'GAME_SLUG');
+}
 ```
+
+**gameCloud API reference:**
+| Method | Purpose |
+|--------|---------|
+| `gameCloud.initAuth(opts)` | Auth listener + button management |
+| `gameCloud.submitScore(gameId, data)` | Submit score (nudges guests) |
+| `gameCloud.submitOrQueue(gameId, data, opts)` | Submit or save locally for guests |
+| `gameCloud.loadState(gameId)` | Load cloud state |
+| `gameCloud.saveState(gameId, state)` | Save cloud state |
+| `gameCloud.saveGuestScore(gameId, data)` | Queue a guest score in localStorage |
+| `gameCloud.syncGuestScores(gameId)` | Sync queued guest scores on sign-in |
+| `gameCloud.unlockAchievement(id, gameId)` | Unlock achievement (silent fail) |
+| `gameCloud.getUser()` | Get current Firebase user |
+| `gameCloud.isSignedIn()` | Check auth status |
 
 ---
 
@@ -146,6 +215,7 @@ Key things to adapt per game:
 ```html
   <script src="../../js/api-client.js"></script>
   <script src="../../js/auth.js"></script>
+  <script src="../../js/game-cloud.js"></script>
 ```
 
 **Critical:** path is `../../js/` — two levels up from `games/<slug>/`. One level
@@ -154,6 +224,9 @@ up (`../js/`) will 404.
 **Do NOT add Firebase SDK script tags** (`firebase-app-compat.js`, `firebase-auth-compat.js`).
 `auth.js` dynamically loads the Firebase SDK automatically. Adding them manually causes
 duplicate initialization and inconsistency.
+
+**Do NOT write custom auth polling, submitScore guards, or cloud state boilerplate.**
+Use `window.gameCloud.*` methods from `game-cloud.js` instead. See section 2.8.
 
 ---
 
@@ -234,13 +307,21 @@ wordle, snake game, arcade games, puzzle games">
 
 ---
 
-## Phase 4: Update `apps/web/src/leaderboard/index.html`
+## Phase 4: Update Game Registry (single source of truth)
 
-Find the `GAMES` array (search for `{ id: 'wordle'`). Add entry at the end:
+**File:** `packages/shared/src/lib/constants/game-registry.ts`
 
-```javascript
-      { id: 'GAME_SLUG', name: 'GAME_NAME', icon: 'GAME_EMOJI', description: 'SHORT_2_4_WORD_DESC' }
+Add entry to `GAME_REGISTRY` array:
+
+```typescript
+  { id: 'GAME_SLUG', name: 'GAME_NAME', icon: 'GAME_EMOJI', description: 'SHORT_DESC', genres: ['genre1', 'genre2'] },
 ```
+
+This is the **single source of truth** for all game metadata. The API serves it at
+`GET /api/games/catalog` (public, no auth). The leaderboard and profile pages fetch
+from this endpoint automatically — **no manual GAMES array update needed** on those pages.
+
+After editing, rebuild shared: `npx nx run shared:build`
 
 ---
 
@@ -264,19 +345,24 @@ Bump all other game entries from `0.9` → `0.8` if any currently sit at `0.9`.
 ## Execution Order
 
 1. Extract all `GAME_*` variables from the PRD
-2. Create `apps/web/src/games/GAME_SLUG/index.html` (full game)
-3. Edit `apps/web/src/index.html` — all 6 changes
-4. Edit `apps/web/src/leaderboard/index.html` — GAMES array
+2. Create `apps/web/src/games/GAME_SLUG/index.html` (full game using `game-cloud.js`)
+3. Edit `packages/shared/src/lib/constants/game-registry.ts` — add GAME_REGISTRY entry
+4. Edit `apps/web/src/index.html` — all 6 changes
 5. Edit `apps/web/src/sitemap.xml` — URL entry
+6. Rebuild shared: `npx nx run shared:build`
 
 ---
 
 ## Quality Checklist
 
 - [ ] Game file at correct path `games/<GAME_SLUG>/index.html`
-- [ ] `../../js/api-client.js` and `../../js/auth.js` included (two levels up)
-- [ ] `submitScoreToCloud` calls `window.apiClient.submitScore('GAME_SLUG', {...})`
-- [ ] gameId in submit exactly matches GAME_SLUG (no typos, right case)
+- [ ] Three scripts included: `api-client.js`, `auth.js`, `game-cloud.js` (two levels up: `../../js/`)
+- [ ] Auth uses `window.gameCloud.initAuth()` (NOT custom polling/onAuthStateChanged)
+- [ ] Score submission uses `window.gameCloud.submitScore()` or `submitOrQueue()` (NOT raw apiClient)
+- [ ] Cloud state uses `window.gameCloud.loadState()` / `saveState()` (NOT raw apiClient)
+- [ ] Achievements use `window.gameCloud.unlockAchievement()` (NOT raw apiClient)
+- [ ] gameId in all `gameCloud.*` calls exactly matches GAME_SLUG (no typos, right case)
+- [ ] `GAME_REGISTRY` entry added in `packages/shared/src/lib/constants/game-registry.ts`
 - [ ] `ACHIEVEMENTS` object defined with `{ name, desc, icon, xp }` shape
 - [ ] `checkAchievements()` called in `onGameEnd()`
 - [ ] `showNewAchievements()` called after `checkAchievements()`
@@ -284,14 +370,12 @@ Bump all other game entries from `0.9` → `0.8` if any currently sit at `0.9`.
 - [ ] `showConfetti()` called on win
 - [ ] `showScorePop()` called when points are awarded during gameplay
 - [ ] `addXP()` called in `onGameEnd()`
-- [ ] `authStateChanged` listener sets `currentUser`
 - [ ] "← All Games" back link present
 - [ ] Hero badge updated to GAME_NAME
 - [ ] NEW tag removed from all previous game cards
-- [ ] New game card has `<span class="tag new">NEW</span>`
+- [ ] New game card has `<span class="tag new">NEW</span>` with `data-genres` attribute
 - [ ] JSON-LD ItemList updated with correct position number
 - [ ] Homepage meta description and keywords mention GAME_NAME
-- [ ] Leaderboard GAMES array has new entry
 - [ ] Sitemap has new `<url>` entry with `priority 0.9`
 - [ ] Deploy date comment updated
 
@@ -299,17 +383,26 @@ Bump all other game entries from `0.9` → `0.8` if any currently sit at `0.9`.
 
 ## Common Mistakes
 
-**Wrong gameId** — The string in `submitScore('GAME_SLUG', ...)` must match the leaderboard
-GAMES array `id` exactly. Any mismatch sends scores to a ghost board.
+**Writing custom auth boilerplate** — Do NOT write `setInterval(() => { if (authManager.isInitialized)...`
+or `if (!currentUser || !window.apiClient) return` guards. Use `gameCloud.initAuth()` and
+`gameCloud.submitScore()` instead — they handle all of this internally.
+
+**Wrong gameId** — The string in `gameCloud.submitScore('GAME_SLUG', ...)` must match the
+`GAME_REGISTRY` entry `id` exactly. Any mismatch sends scores to a ghost board.
+
+**Missing game-cloud.js** — Without `game-cloud.js`, `gameCloud` is undefined and all
+auth/score/cloud calls fail. Always include all three scripts: `api-client.js`, `auth.js`,
+`game-cloud.js`.
+
+**Missing GAME_REGISTRY entry** — The game catalog API and leaderboard/profile pages read
+from `GAME_REGISTRY`. Without an entry, the game won't appear in the leaderboard game picker
+or profile recent games.
 
 **Wrong script path** — From `games/<slug>/index.html` use `../../js/`. Using `../js/`
 causes a 404 and the entire auth + score system silently stops working.
 
-**Missing auth.js** — Without `auth.js`, `authStateChanged` never fires, `currentUser`
-stays null, and all score submissions silently skip.
-
 **Hero badge not updated** — Players discover new games through the hero section.
-Always update `🎉 New Game This Week: GAME_NAME`.
+Always update the hero to feature the new game.
 
 **NEW tag left on old games** — Only the current week's game gets the `new` CSS class.
 Strip it from every previous card when adding the new one.

@@ -329,28 +329,39 @@ function addXP(amount) {
 
 ---
 
-## Score Submission — Exact API Pattern
+## Score Submission — via game-cloud.js
+
+**Do NOT write raw `apiClient.submitScore` calls with auth guards.** Use `game-cloud.js`:
 
 ```javascript
-// ── SCORE SUBMISSION ───────────────────────────────────────
-async function submitScoreToCloud(scoreValue, extras = {}) {
-  if (!currentUser || !window.apiClient) return;
-  try {
-    const result = await window.apiClient.submitScore('GAME_SLUG', {
-      score: scoreValue,
-      // include only fields relevant to this game (see SubmitScoreDto):
-      // level: currentLevel,
-      // timeMs: elapsedMs,
-      // guessCount: attempts,
-      // metadata: { wave: 5, deck: 'merchant' },
-      ...extras,
-    });
-    console.log('[GAME_NAME] Score submitted:', result);
-  } catch (err) {
-    console.error('[GAME_NAME] Score submit failed:', err);
-  }
+// ── SCORE SUBMISSION (via game-cloud.js) ───────────────────
+
+// Option A: Simple submit (for games without guest score queuing)
+// Handles auth check, nudge for guests, error logging internally.
+async function submitScore() {
+  await window.gameCloud.submitScore('GAME_SLUG', {
+    score: scoreValue,
+    level: currentLevel,
+    timeMs: elapsedMs,
+    metadata: { wave: 5, deck: 'merchant' },
+  });
+}
+
+// Option B: Submit or queue (for games that store guest scores locally)
+// If signed in: submits directly. If guest: saves to localStorage queue.
+// { silent: true } suppresses the auth nudge (use for milestones/level-ups).
+async function submitScore(isMilestone = false) {
+  await window.gameCloud.submitOrQueue('GAME_SLUG', {
+    score: scoreValue,
+    level: currentLevel,
+    timeMs: elapsedMs,
+    metadata: { /* game-specific */ },
+  }, { silent: isMilestone });
 }
 ```
+
+The old `submitScoreToCloud` pattern with manual `if (!currentUser) return` is deprecated.
+All new games must use `gameCloud.submitScore()` or `gameCloud.submitOrQueue()`.
 
 ---
 
@@ -445,8 +456,8 @@ function onGameEnd(won, scoreValue, extras = {}) {
   // 5. Show achievement toasts (staggered)
   showNewAchievements(newAchievements);
 
-  // 6. Submit score to cloud
-  submitScoreToCloud(scoreValue, extras);
+  // 6. Submit score to cloud (via game-cloud.js)
+  window.gameCloud.submitScore('GAME_SLUG', { score: scoreValue, ...extras });
 
   // 7. Show game-over UI (your own modal/overlay)
   showGameOverModal(won, scoreValue);
