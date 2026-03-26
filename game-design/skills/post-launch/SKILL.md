@@ -9,6 +9,65 @@ description: >
 
 # Post-Launch Iteration
 
+**Arguments**: $ARGUMENTS
+
+## Step 0: Check for Existing Post-Launch Plan
+
+Before running the full analysis, check if a post-launch plan already exists for this game.
+
+```
+GAME_SLUG = first word of $ARGUMENTS (e.g., "tiny-tycoon")
+PLAN_PATH = apps/web/src/games/{GAME_SLUG}/post-launch.md
+
+IF file exists at PLAN_PATH:
+  READ the file
+  PARSE the patch list (## Patches section)
+
+  pending = patches where status is "[ ]" (unchecked)
+  completed = patches where status is "[x]" (checked)
+
+  IF pending.length > 0:
+    DISPLAY:
+      "## Existing Post-Launch Plan Found"
+      ""
+      "**Game**: {GAME_SLUG}"
+      "**Progress**: {completed.length}/{total} patches applied"
+      ""
+      "### Pending Patches (priority order):"
+      {list pending patches with their scores}
+      ""
+      "### Completed Patches:"
+      {list completed patches}
+      ""
+      "**Recommendation**: Apply the next pending patch before re-running full analysis."
+      "To apply: describe which patch to implement, or say 'apply next' for the highest priority."
+      "To re-run full analysis: say 'post-launch {GAME_SLUG} --fresh'"
+
+    WAIT for user instruction:
+      IF user says "apply next" or names a specific patch:
+        IMPLEMENT the patch in the game code
+        UPDATE post-launch.md: check off the patch as [x], add date
+        RUN improvement checklist (Section 7)
+        COMMIT changes
+        STOP
+
+      IF user says "--fresh" or "re-run":
+        CONTINUE to full analysis (Step 1+)
+
+  ELSE (all patches completed):
+    DISPLAY:
+      "## All Patches Applied!"
+      "All {total} patches from the previous analysis have been implemented."
+      "Running fresh analysis to identify new improvements..."
+
+    CONTINUE to full analysis (Step 1+)
+
+ELSE (no plan file exists):
+  CONTINUE to full analysis (Step 1+)
+```
+
+---
+
 ## Core Principle: Ship → Observe → Improve → Repeat
 
 No game is perfect at launch. The best games are the ones that iterate quickly based on real player behavior.
@@ -195,3 +254,88 @@ If a game goes quiet, consider:
 2. Adding a new mechanic or event
 3. Creating a "challenge of the week" variant
 4. Retiring it gracefully (archive, don't delete)
+
+---
+
+## 9. Save Post-Launch Plan
+
+After completing the full analysis, save the plan as a file inside the game folder
+so subsequent runs can resume from where you left off.
+
+**File**: `apps/web/src/games/{GAME_SLUG}/post-launch.md`
+
+Also save a copy to: `~/Documents/weekly-games/{GAME_SLUG}-post-launch.md`
+
+### File Format
+
+```markdown
+# Post-Launch Plan: {GAME_NAME}
+
+**Created**: {date}
+**Last Updated**: {date}
+**Status**: {IN_PROGRESS | ALL_APPLIED | MONITORING}
+
+---
+
+## Funnel Assessment
+
+{Copy of the improvement funnel findings from the analysis}
+
+---
+
+## Patches
+
+Ordered by improvement matrix score (highest first).
+Check off each patch as it's applied.
+
+### Week 1 — Fix & Clarify
+
+- [ ] **#{n} {title}** (Score: {score}) — {one-line description}
+  - Category: {BROKEN | CONFUSING | UNFUN}
+  - Files: {likely files to modify}
+  - Applied: {date or blank}
+
+- [ ] **#{n} {title}** (Score: {score}) — {one-line description}
+  ...
+
+### Week 2 — Polish & Feel
+
+- [ ] **#{n} {title}** (Score: {score}) — {one-line description}
+  ...
+
+### Week 3+ — Depth & Content
+
+- [ ] **#{n} {title}** (Score: {score}) — {one-line description}
+  ...
+
+---
+
+## Metrics Baseline
+
+| Metric | Value at Analysis | Target |
+|--------|-------------------|--------|
+| ... | ... | ... |
+
+---
+
+## Cut Candidates
+
+| Element | Verdict | Notes |
+|---------|---------|-------|
+| ... | ... | ... |
+
+---
+
+## Health Check Log
+
+| Date | Signal | Action Taken |
+|------|--------|-------------|
+| {date} | Initial analysis | Plan created |
+| ... | ... | ... |
+```
+
+### After Saving
+
+1. Display the plan summary to the user
+2. Recommend starting with the highest-scored pending patch
+3. Remind: "Run `/post-launch {GAME_SLUG}` again to apply the next patch"
