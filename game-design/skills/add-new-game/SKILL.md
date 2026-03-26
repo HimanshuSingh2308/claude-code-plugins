@@ -32,8 +32,9 @@ apps/web/src/
       index.html               ← The entire game (create this)
   js/
     api-client.js              ← Shared API client (DO NOT MODIFY)
-    auth.js                    ← Auth manager + auth nudge (DO NOT MODIFY)
-    game-cloud.js              ← Shared auth/score/cloud library (DO NOT MODIFY)
+    auth.js                    ← Auth manager + auth nudge + user cache (DO NOT MODIFY)
+    game-cloud.js              ← Score/cloud/achievements/wake-lock library (DO NOT MODIFY)
+    game-header.js             ← Shared header component + auto-auth (DO NOT MODIFY)
 packages/shared/src/
   lib/types/leaderboard.types.ts   ← SubmitScoreDto shape
   lib/constants/scoring.ts         ← SCORING constants, helpers
@@ -116,75 +117,90 @@ the GAMES array and sitemap. One mismatch = scores go to a ghost leaderboard.
 
 ---
 
-### 2.8 Auth + Cloud integration (via game-cloud.js)
+### 2.8 Header + Auth + Cloud integration
 
-All auth state, score submission, cloud save/load, guest score queuing, and achievements
-are handled by the shared `game-cloud.js` library. **Do NOT write custom auth polling,
-submitScore guards, or cloud state boilerplate** — use the `gameCloud` API instead.
+All games use three shared libraries. **Do NOT write custom headers, auth polling,
+submitScore guards, or cloud state boilerplate.**
+
+#### Header (via game-header.js)
+
+The shared header component renders the back button, title, and action buttons.
+It also auto-wires auth via `gameCloud.initAuth` — no separate auth init needed.
+
+Add this HTML in the `<body>` (with inline fallback for when JS hasn't loaded):
+
+```html
+<header id="gameHeader" style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0.75rem;background:var(--bg-secondary,#1a1a2e);border-bottom:1px solid var(--border,rgba(255,255,255,0.06));">
+  <a href="/" style="color:#888;text-decoration:none;font-size:1.3rem;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;">←</a>
+  <span style="font-weight:700;font-size:1.05rem;">GAME_EMOJI GAME_NAME</span>
+  <span></span>
+</header>
+```
+
+Then in JS (after DOM ready):
 
 ```javascript
-// ── AUTH & CLOUD (via shared game-cloud.js) ─────────────────
 let currentUser = null;
 let cloudState = null;
 
-function initAuth() {
-  window.gameCloud.initAuth({
-    authBtnId: 'authBtn',        // ID of the sign-in button (or null for custom UI)
-    signInStyle: 'name',          // 'name' shows first name, 'button' shows Sign In/Profile
-    onSignIn: async (user) => {
-      currentUser = user;
-      cloudState = await window.gameCloud.loadState('GAME_SLUG');
-      // Merge cloud state with local (e.g. sync high score)
-      if (cloudState?.additionalData?.highScore > localHighScore) {
-        localHighScore = cloudState.additionalData.highScore;
-        localStorage.setItem('GAME_SLUG-high-score', localHighScore);
-      }
-      // If this game uses guest score queuing:
-      await window.gameCloud.syncGuestScores('GAME_SLUG');
-    },
-    onSignOut: () => { currentUser = null; cloudState = null; }
-  });
-}
+// Header renders ←, title, buttons AND wires auth automatically
+const headerApi = window.gameHeader.init({
+  title: 'GAME_NAME',
+  icon: 'GAME_EMOJI',
+  gameId: 'GAME_SLUG',
+  buttons: ['sound', 'leaderboard', 'auth'],  // pick which buttons to show
+  onSound: () => toggleSound(),
+  onSignIn: async (user) => {
+    currentUser = user;
+    cloudState = await window.gameCloud.loadState('GAME_SLUG');
+    // Merge cloud state with local (e.g. sync high score)
+    if (cloudState?.additionalData?.highScore > localHighScore) {
+      localHighScore = cloudState.additionalData.highScore;
+      localStorage.setItem('GAME_SLUG-high-score', localHighScore);
+    }
+    await window.gameCloud.syncGuestScores('GAME_SLUG');
+  },
+  onSignOut: () => { currentUser = null; cloudState = null; }
+});
 
+// Use headerApi for dynamic updates:
+// headerApi.setSoundMuted(true/false)
+// headerApi.setHintCount(n)
+// headerApi.showUndo(true/false, count)
+```
+
+**Available buttons:** `'sound'`, `'leaderboard'`, `'auth'`, `'hint'`, `'help'`, `'menu'`, `'undo'`
+
+**What the header handles for you:**
+- Back `←` link to homepage
+- Title (left-aligned on mobile, centered on desktop)
+- Auth button → avatar when signed in, "Sign In" when not
+- `gameCloud.initAuth()` called automatically (no separate auth init)
+- User cached in localStorage for instant avatar on page load
+- 44px touch targets, safe-area padding, responsive
+
+#### Cloud (via game-cloud.js)
+
+```javascript
 // Score submission — gameCloud handles auth guard + guest nudge
-async function submitScore() {
-  // Option A: Simple submit (skips silently for guests, shows nudge)
-  await window.gameCloud.submitScore('GAME_SLUG', {
-    score: score,
-    level: level,
-    timeMs: Date.now() - gameStartTime,
-    metadata: { /* game-specific */ }
-  });
+await window.gameCloud.submitScore('GAME_SLUG', {
+  score, level, timeMs, metadata: { ... }
+});
 
-  // Option B: Submit or queue (for games that store guest scores locally)
-  await window.gameCloud.submitOrQueue('GAME_SLUG', scoreData, { silent: false });
-}
+// Or: submit or queue for guest score storage
+await window.gameCloud.submitOrQueue('GAME_SLUG', scoreData, { silent: false });
 
-// Cloud state — gameCloud handles auth guard + error handling
-async function saveCloudState(won = false) {
-  const prev = cloudState || {};
-  const newState = {
-    currentLevel: level,
-    currentStreak: 0,
-    bestStreak: Math.max(prev.bestStreak || 0, level),
-    gamesPlayed: (prev.gamesPlayed || 0) + 1,
-    gamesWon: (prev.gamesWon || 0) + (won ? 1 : 0),
-    lastPlayedDate: new Date().toISOString().split('T')[0],
-    additionalData: { highScore, lastScore: score }
-  };
-  await window.gameCloud.saveState('GAME_SLUG', newState);
-  cloudState = newState;
+// Cloud state save/load
+cloudState = await window.gameCloud.loadState('GAME_SLUG');
+await window.gameCloud.saveState('GAME_SLUG', newState);
 
-  // Achievements — gameCloud handles auth guard + silent fail
-  if (newState.gamesPlayed === 1) window.gameCloud.unlockAchievement('first_game', 'GAME_SLUG');
-  if (newState.gamesWon >= 10) window.gameCloud.unlockAchievement('ten_wins', 'GAME_SLUG');
-}
+// Achievements
+window.gameCloud.unlockAchievement('first_game', 'GAME_SLUG');
 ```
 
 **gameCloud API reference:**
 | Method | Purpose |
 |--------|---------|
-| `gameCloud.initAuth(opts)` | Auth listener + button management |
 | `gameCloud.submitScore(gameId, data)` | Submit score (nudges guests) |
 | `gameCloud.submitOrQueue(gameId, data, opts)` | Submit or save locally for guests |
 | `gameCloud.loadState(gameId)` | Load cloud state |
@@ -216,25 +232,25 @@ Key things to adapt per game:
   <script src="../../js/api-client.js"></script>
   <script src="../../js/auth.js"></script>
   <script src="../../js/game-cloud.js"></script>
+  <script src="../../js/game-header.js"></script>
 ```
 
 **Critical:** path is `../../js/` — two levels up from `games/<slug>/`. One level
 up (`../js/`) will 404.
 
 **Do NOT add Firebase SDK script tags** (`firebase-app-compat.js`, `firebase-auth-compat.js`).
-`auth.js` dynamically loads the Firebase SDK automatically. Adding them manually causes
-duplicate initialization and inconsistency.
+`auth.js` dynamically loads the Firebase SDK automatically.
 
-**Do NOT write custom auth polling, submitScore guards, or cloud state boilerplate.**
-Use `window.gameCloud.*` methods from `game-cloud.js` instead. See section 2.8.
+**Do NOT write custom headers, auth polling, submitScore guards, or cloud state boilerplate.**
+Use `gameHeader.init()` for header+auth, `gameCloud.*` for cloud. See section 2.8.
 
 ---
 
-### 2.11 Required back link (anywhere in `<body>`)
+### 2.11 Header element (replaces back link)
 
-```html
-<a href="../../">← All Games</a>
-```
+The `<header id="gameHeader">` element with inline fallback replaces the old `← All Games`
+back link. See section 2.8 for the full HTML. **Do NOT add a separate back link** — the
+header component provides one automatically.
 
 ---
 
@@ -355,22 +371,30 @@ Bump all other game entries from `0.9` → `0.8` if any currently sit at `0.9`.
 
 ## Quality Checklist
 
+**Scripts & Header:**
 - [ ] Game file at correct path `games/<GAME_SLUG>/index.html`
-- [ ] Three scripts included: `api-client.js`, `auth.js`, `game-cloud.js` (two levels up: `../../js/`)
-- [ ] Auth uses `window.gameCloud.initAuth()` (NOT custom polling/onAuthStateChanged)
-- [ ] Score submission uses `window.gameCloud.submitScore()` or `submitOrQueue()` (NOT raw apiClient)
-- [ ] Cloud state uses `window.gameCloud.loadState()` / `saveState()` (NOT raw apiClient)
-- [ ] Achievements use `window.gameCloud.unlockAchievement()` (NOT raw apiClient)
-- [ ] gameId in all `gameCloud.*` calls exactly matches GAME_SLUG (no typos, right case)
+- [ ] Four scripts included: `api-client.js`, `auth.js`, `game-cloud.js`, `game-header.js` (path: `../../js/`)
+- [ ] `<header id="gameHeader">` present with inline fallback (← + game name)
+- [ ] `gameHeader.init()` called with title, icon, gameId, buttons, onSignIn/onSignOut
+- [ ] NO separate `gameCloud.initAuth()` call (header handles it)
+- [ ] NO custom header CSS (shared `game-header.js` injects its own)
+- [ ] NO manual back link (header provides ← automatically)
+
+**Cloud & Scores:**
+- [ ] Score submission uses `gameCloud.submitScore()` or `submitOrQueue()` (NOT raw apiClient)
+- [ ] Cloud state uses `gameCloud.loadState()` / `saveState()` (NOT raw apiClient)
+- [ ] Achievements use `gameCloud.unlockAchievement()` (NOT raw apiClient)
+- [ ] gameId in all calls exactly matches GAME_SLUG
+
+**Game Content:**
 - [ ] `GAME_REGISTRY` entry added in `packages/shared/src/lib/constants/game-registry.ts`
 - [ ] `ACHIEVEMENTS` object defined with `{ name, desc, icon, xp }` shape
 - [ ] `checkAchievements()` called in `onGameEnd()`
-- [ ] `showNewAchievements()` called after `checkAchievements()`
 - [ ] `playSound()` called for all key game events (move, score, win, fail)
 - [ ] `showConfetti()` called on win
-- [ ] `showScorePop()` called when points are awarded during gameplay
 - [ ] `addXP()` called in `onGameEnd()`
-- [ ] "← All Games" back link present
+
+**Landing Page & SEO:**
 - [ ] Hero badge updated to GAME_NAME
 - [ ] NEW tag removed from all previous game cards
 - [ ] New game card has `<span class="tag new">NEW</span>` with `data-genres` attribute
@@ -383,32 +407,36 @@ Bump all other game entries from `0.9` → `0.8` if any currently sit at `0.9`.
 
 ## Common Mistakes
 
+**Writing custom header HTML/CSS** — Do NOT create a `<header>` with your own back button,
+title styling, or auth button markup. Use `<header id="gameHeader">` with inline fallback +
+`gameHeader.init()`. The shared component handles layout, auth, avatar, responsive, and touch targets.
+
+**Calling gameCloud.initAuth separately** — Do NOT call `gameCloud.initAuth()` yourself.
+`gameHeader.init()` calls it automatically when `'auth'` is in the buttons array. Calling
+both results in duplicate auth listeners and double sign-in callbacks.
+
 **Writing custom auth boilerplate** — Do NOT write `setInterval(() => { if (authManager.isInitialized)...`
-or `if (!currentUser || !window.apiClient) return` guards. Use `gameCloud.initAuth()` and
-`gameCloud.submitScore()` instead — they handle all of this internally.
+or `if (!currentUser || !window.apiClient) return` guards. Use `gameCloud.submitScore()` —
+it handles auth checking and guest nudge internally.
 
 **Wrong gameId** — The string in `gameCloud.submitScore('GAME_SLUG', ...)` must match the
 `GAME_REGISTRY` entry `id` exactly. Any mismatch sends scores to a ghost board.
 
-**Missing game-cloud.js** — Without `game-cloud.js`, `gameCloud` is undefined and all
-auth/score/cloud calls fail. Always include all three scripts: `api-client.js`, `auth.js`,
-`game-cloud.js`.
+**Missing scripts** — Always include all four: `api-client.js`, `auth.js`, `game-cloud.js`,
+`game-header.js`. Missing any one breaks auth, scores, or the header.
 
-**Missing GAME_REGISTRY entry** — The game catalog API and leaderboard/profile pages read
-from `GAME_REGISTRY`. Without an entry, the game won't appear in the leaderboard game picker
-or profile recent games.
+**Missing header fallback** — The `<header id="gameHeader">` must have inline fallback
+HTML/CSS (← + game name). Without it, if `game-header.js` fails to load (stale SW cache),
+users see no header and can't navigate back.
+
+**Missing GAME_REGISTRY entry** — The leaderboard, profile, and game catalog API read
+from `GAME_REGISTRY`. Without an entry, the game won't appear anywhere except direct URL.
 
 **Wrong script path** — From `games/<slug>/index.html` use `../../js/`. Using `../js/`
-causes a 404 and the entire auth + score system silently stops working.
+causes a 404 and everything silently breaks.
 
-**Hero badge not updated** — Players discover new games through the hero section.
-Always update the hero to feature the new game.
-
-**NEW tag left on old games** — Only the current week's game gets the `new` CSS class.
-Strip it from every previous card when adding the new one.
-
-**Achievement toast queue** — `activeToasts` tracks vertical stacking. It is a module-level
-`let` variable, not scoped inside a function. Declare it at the top of the script block.
+**Nested comments in JSDoc** — Never use `/* ... */` inside a `/** ... */` block. The
+inner `*/` closes the outer comment and causes a SyntaxError in the shared JS file.
 
 **Audio on mobile** — Web Audio API requires a user gesture to start. Never call
 `playSound()` on page load. Only call it inside event handlers (click, keydown, touch).
