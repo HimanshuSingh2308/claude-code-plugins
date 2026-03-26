@@ -1,6 +1,6 @@
 ---
-description: Run comprehensive quality audit on any game - code review, visual QA, functional QA, accessibility, economy balance, and security validation
-argument-hint: <game-slug> [--review-only | --visual-only | --qa-only | --accessibility-only | --economy-only | --security-only | --fix]
+description: Run comprehensive quality audit on one or more games - code review, visual QA, functional QA, accessibility, economy balance, and security validation. Supports batch mode for auditing multiple games in parallel.
+argument-hint: <game-slug> [game-slug-2 ...] [--review-only | --visual-only | --qa-only | --accessibility-only | --economy-only | --security-only | --fix | --batch]
 ---
 
 # Game Audit
@@ -38,10 +38,10 @@ Use this to:
 ## Command Options
 
 ```
-/game-audit <game-slug> [options]
+/game-audit <game-slug> [game-slug-2 ...] [options]
 
 Arguments:
-  <game-slug>          The game folder name (e.g., "emoji-match", "word-stack")
+  <game-slug>          One or more game folder names (e.g., "emoji-match", "word-stack")
 
 Options:
   --review-only        Run code review only
@@ -53,13 +53,19 @@ Options:
   --fix                Auto-fix issues found (requires confirmation)
   --output <path>      Save report to specific path
   --verbose            Show detailed findings
+  --batch              Explicit batch mode (auto-enabled when multiple slugs provided)
 ```
 
 ## Usage Examples
 
-### Full Audit
+### Full Audit (Single Game)
 ```bash
 /game-audit emoji-match
+```
+
+### Batch Audit (Multiple Games)
+```bash
+/game-audit emoji-match word-stack puzzle-game
 ```
 
 ### Code Review Only
@@ -106,125 +112,97 @@ ls apps/web/src/games/{game-slug}/
 ls apps/web/src/games/
 ```
 
-### Step 2: Run Code Review
+### Step 2: Read Game Files Once (Shared Context)
 
 ```yaml
-Agent: game-code-reviewer
-Target: apps/web/src/games/{game-slug}/**
-Knowledge: game-balancing, performance-tuning
+Purpose: Read all game files ONCE upfront and share the parsed context across all agents.
+         This eliminates redundant file I/O — 6 agents reading the same files independently
+         would cost 6x the read operations.
 
-Output:
-  - Overall score (/30)
-  - Issues by category (architecture, performance, mobile, audio, animation, security)
-  - Improvement suggestions
-  - Difficulty/scoring assessment (informed by game-balancing knowledge)
-  - Performance evaluation (informed by performance-tuning knowledge)
+Files to read:
+  - apps/web/src/games/{game-slug}/**   (all game source files)
+  - apps/web/src/index.html             (integration check)
+  - apps/web/src/leaderboard/index.html (leaderboard integration)
+
+Store: game_context = { sourceFiles, htmlContent, fileCount, hasEconomy, hasLeaderboard }
 ```
 
-### Step 3: Visual QA
+### Step 3: Run ALL Agents in Parallel
+
+**IMPORTANT**: Launch all 6 agents concurrently using parallel Agent tool calls in a single message.
+Each agent is independent — they read the same game files and produce separate reports.
+Running them sequentially wastes ~80% of the audit time.
 
 ```yaml
-Agent: game-visual-tester
-Target: apps/web/src/games/{game-slug}/
-Knowledge: mobile-game-ux
+# Launch ALL of these agents in a SINGLE message with parallel tool calls:
 
-Steps:
-  1. Desktop testing (1920x1080) — screenshot load, menu, gameplay, game over
-  2. Mobile testing (iPhone 14 Pro, iPhone SE, Pixel 7) — emulate + screenshot all states
-  3. Responsive breakpoints (320, 375, 414, 768, 1024, 1920)
-  4. Console/network error check
-  5. Lighthouse performance + accessibility scores
+Agent 1 - Code Review:
+  agent: game-code-reviewer
+  target: apps/web/src/games/{game-slug}/**
+  knowledge: game-balancing, performance-tuning
+  output: Overall score (/30), issues by category, improvement suggestions
 
-Output:
-  - Visual QA report with screenshot inventory
-  - Viewport pass/fail matrix
-  - Console errors found
-  - Lighthouse scores
-  - Mobile UX assessment (informed by mobile-game-ux knowledge)
+Agent 2 - Visual QA:
+  agent: game-visual-tester
+  target: apps/web/src/games/{game-slug}/
+  knowledge: mobile-game-ux
+  output: Viewport pass/fail matrix, Lighthouse scores, console errors
+
+Agent 3 - Functional QA:
+  agent: game-qa-tester
+  target: apps/web/src/games/{game-slug}/**
+  knowledge: playtesting
+  output: Bugs by severity, UX issues, mobile compatibility
+
+Agent 4 - Accessibility Audit:
+  agent: game-accessibility-auditor
+  target: apps/web/src/games/{game-slug}/
+  knowledge: game-accessibility
+  output: Accessibility score (/65), WCAG compliance, issues by severity
+
+Agent 5 - Economy Validation (skip if no economy system):
+  agent: game-economy-validator
+  target: apps/web/src/games/{game-slug}/
+  knowledge: game-balancing
+  output: Economy health, dead zone warnings, balance recommendations
+
+Agent 6 - Security Validation:
+  agent: leaderboard-validator
+  target: apps/web/src/games/{game-slug}/**
+  output: Security assessment, vulnerabilities, anti-cheat evaluation
 ```
 
-### Step 4: Functional QA
+**Why parallel**: Each agent analyzes different dimensions independently. No agent's output
+feeds into another agent's input. Parallel execution reduces audit time from ~6x to ~1x
+(bounded by the slowest agent).
+
+### Step 4: Collect & Merge Results
 
 ```yaml
-Agent: game-qa-tester
-Target: apps/web/src/games/{game-slug}/**
-Knowledge: playtesting
+Wait for all 6 agents to complete, then merge results:
 
-Output:
-  - Bugs by severity
-  - UX issues
-  - Mobile compatibility
-  - Feel/pacing assessment (informed by playtesting knowledge)
+results = {
+  codeReview:    agent1.output,   # score /30, issues
+  visualQa:      agent2.output,   # viewport matrix, Lighthouse
+  functionalQa:  agent3.output,   # bugs by severity
+  accessibility:  agent4.output,   # score /65, WCAG
+  economy:       agent5.output,   # health, dead zones (or "N/A")
+  security:      agent6.output,   # assessment, vulns
+}
+
+# Cross-reference findings across agents for duplicates
+# e.g., visual-tester and qa-tester may both flag the same mobile layout bug
+deduplicate(results)
 ```
 
-### Step 5: Accessibility Audit
-
-```yaml
-Agent: game-accessibility-auditor
-Target: apps/web/src/games/{game-slug}/
-Knowledge: game-accessibility
-
-Checks:
-  - Lighthouse accessibility score (target: 90+)
-  - Color contrast (WCAG AA)
-  - prefers-reduced-motion support
-  - Touch targets >= 44px
-  - Keyboard navigation
-  - Screen reader ARIA labels
-  - Non-color state indicators
-
-Target score: 45/65+
-
-Output:
-  - Accessibility score and breakdown
-  - Issues by severity
-  - WCAG compliance status
-```
-
-### Step 6: Economy Validation
-
-```yaml
-Agent: game-economy-validator
-Target: apps/web/src/games/{game-slug}/
-Knowledge: game-balancing
-
-Checks:
-  - Revenue projection (no upgrades) for 20 sessions
-  - Revenue projection (with optimal upgrades)
-  - Dead zone detection (can't afford anything for 3+ sessions)
-  - Upgrade payback analysis (target: 1.5-4 sessions)
-  - Dominant upgrade check
-  - Score spread ratio (target: 10-30x)
-
-Output:
-  - Economy health assessment
-  - Dead zone warnings
-  - Balance recommendations
-
-Note: Skip if game has no economy/upgrade system
-```
-
-### Step 7: Security Validation
-
-```yaml
-Agent: leaderboard-validator
-Target: apps/web/src/games/{game-slug}/**
-
-Output:
-  - Security assessment
-  - Vulnerabilities found
-  - Risk levels
-  - Anti-cheat evaluation
-```
-
-### Step 8: Generate Report
+### Step 5: Generate Report
 
 ```markdown
 # Game Audit Report: {game-name}
 
 **Date**: {date}
 **Game**: {game-slug}
-**Auditor**: Game Audit Command v3.0
+**Auditor**: Game Audit Command v4.0 (parallel agents)
 
 ---
 
@@ -426,9 +404,69 @@ Custom: Use `--output <path>` to specify location
 
 ---
 
+## Batch Audit Mode (Multiple Games)
+
+When multiple game slugs are provided, run audits in parallel for maximum efficiency.
+
+### Batch Workflow
+
+```
+1. Validate all game slugs exist:
+   FOR slug IN game_slugs (PARALLEL):
+     ls apps/web/src/games/{slug}/
+   IF any missing: report and continue with valid ones
+
+2. Read all game files upfront (PARALLEL):
+   FOR slug IN valid_slugs (PARALLEL):
+     game_contexts[slug] = read(apps/web/src/games/{slug}/**)
+
+3. Launch all audits in PARALLEL:
+   # For N games × 6 agents = 6N agent calls, but organized as N parallel audit groups
+   FOR slug IN valid_slugs (PARALLEL — each game's 6 agents also run in parallel):
+     results[slug] = run_parallel_agents(slug)  # Same as single-game Step 3
+
+4. Generate Comparative Report:
+   Merge all individual reports into a side-by-side comparison
+```
+
+### Comparative Report Format
+
+```markdown
+# Batch Audit Report
+
+**Date**: {date}
+**Games Audited**: {count}
+
+## Comparison Matrix
+
+| Metric | {game1} | {game2} | {game3} | Average |
+|--------|---------|---------|---------|---------|
+| Code Quality (/30) | {n} | {n} | {n} | {avg} |
+| Accessibility (/65) | {n} | {n} | {n} | {avg} |
+| Lighthouse Perf | {n} | {n} | {n} | {avg} |
+| Lighthouse A11y | {n} | {n} | {n} | {avg} |
+| Bug Count (CRIT/HIGH) | {n} | {n} | {n} | — |
+| Bug Count (MED/LOW) | {n} | {n} | {n} | — |
+| Economy Health | {status} | {status} | {status} | — |
+| Security | {status} | {status} | {status} | — |
+
+## Common Patterns Across Games
+{Issues that appear in multiple games — fix once, apply everywhere}
+
+## Per-Game Details
+{Individual audit reports follow}
+```
+
+### Batch Output Location
+
+Default: `~/Documents/weekly-games/audits/batch-audit-{date}.md`
+
+---
+
 ## Notes
 
 - Audit is read-only by default (no changes made)
 - Use `--fix` to enable auto-fixing with confirmations
 - All fixes follow `orchestrator-guardrails` rules
 - Audit results can be used for sprint planning
+- Batch mode auto-enables when multiple game slugs are provided

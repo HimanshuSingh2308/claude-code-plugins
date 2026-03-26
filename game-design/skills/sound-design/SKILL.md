@@ -88,353 +88,107 @@ document.addEventListener('touchstart', () => audio.init(), { once: true });
 
 ## Sound Effect Library
 
-### UI Sounds
+All SFX follow the same oscillator pattern. The table below defines each sound's parameters.
+Use the **pattern template** with values from the table to generate any sound.
+
+### Oscillator Pattern Template
 
 ```javascript
-const SFX = {
-  // Button click - short, satisfying
-  click() {
-    const { osc, gain, ctx } = audio.createOscillator('sine', 800);
-    if (!osc) return;
+// Single-tone SFX pattern
+function singleTone(type, freq, volume, duration, freqRamp) {
+  const { osc, gain, ctx } = audio.createOscillator(type, freq);
+  if (!osc) return;
+  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  if (freqRamp) osc.frequency.linearRampToValueAtTime(freqRamp, ctx.currentTime + duration * 0.7);
+  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + duration);
+}
 
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.1);
-  },
-
-  // Hover/focus - subtle
-  hover() {
-    const { osc, gain, ctx } = audio.createOscillator('sine', 600);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.03, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.05);
-  },
-
-  // Toggle on
-  toggleOn() {
-    const { osc, gain, ctx } = audio.createOscillator('sine', 500);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    osc.frequency.setValueAtTime(500, ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(700, ctx.currentTime + 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.15);
-  },
-
-  // Toggle off
-  toggleOff() {
-    const { osc, gain, ctx } = audio.createOscillator('sine', 700);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    osc.frequency.setValueAtTime(700, ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(400, ctx.currentTime + 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.15);
-  },
-};
+// Multi-note SFX pattern (arpeggios, chords, melodies)
+function multiNote(type, notes, volume, noteDuration, spacing, simultaneous = false) {
+  if (!audio.ctx) return;
+  notes.forEach((freq, i) => {
+    const { osc, gain, ctx } = audio.createOscillator(type, freq);
+    const startTime = simultaneous ? ctx.currentTime : ctx.currentTime + (i * spacing);
+    gain.gain.setValueAtTime(volume, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, startTime + noteDuration);
+    osc.start(startTime);
+    osc.stop(startTime + noteDuration);
+  });
+}
 ```
 
-### Game Action Sounds
+### SFX Reference Table
+
+| Name | Type | Pattern | Freq(s) | Vol | Duration | Notes |
+|------|------|---------|---------|-----|----------|-------|
+| **UI Sounds** |
+| click | sine | single | 800 | 0.1 | 0.1s | Short, satisfying |
+| hover | sine | single | 600 | 0.03 | 0.05s | Subtle |
+| toggleOn | sine | single | 500→700 | 0.1 | 0.15s | Rising pitch |
+| toggleOff | sine | single | 700→400 | 0.1 | 0.15s | Falling pitch |
+| **Game Actions** |
+| move | sine | single | 440 | 0.08 | 0.05s | Cursor/selection |
+| score | sine | single | 523→784 | 0.1 | 0.2s | Rising tone |
+| bigScore | sine | multi | [523,659,784,1047] | 0.1 | 0.2s | C major arpeggio, 80ms spacing |
+| combo(n) | triangle | single | 400+(n*50) | 0.08 | 0.1s | Pitch rises with combo |
+| collect | sine | single | 880→1760 | 0.08 | 0.15s | Octave jump up |
+| **Feedback** |
+| success | sine | multi | [523,659,784] | 0.08 | 0.3s | C-E-G chord, simultaneous |
+| error | sawtooth | single | 150 | 0.1 | 0.3s | Low buzz |
+| warning | square | multi | [440,440] | 0.05 | 0.1s | 2 beeps, 150ms spacing |
+| gameOver | sine | multi | [392,349,330,294] | 0.1 | 0.3s | Descending, 200ms spacing |
+| victory | triangle | multi | [523,523,523,698,880] | 0.1 | var | Fanfare melody |
+| levelUp | triangle | multi | [523,659,784,1047] | 0.1 | 0.3s | Ascending arpeggio, 100ms |
+| achievement | sine | multi | [1047,1319,1568,2093] | 0.06 | 0.2s | High sparkle, 50ms |
+| **Timers** |
+| tick | sine | single | 1000 | 0.03 | 0.02s | Metronome tick |
+| countdown(final) | sine | single | 440/880 | 0.1 | 0.1/0.3s | Higher on final |
+
+### Noise-Based SFX (Special — use noise buffer, not oscillator)
 
 ```javascript
+// Explosion: white noise burst with lowpass sweep 1000→100Hz, 0.3s, vol 0.3
+// Whoosh: bandpass noise at 2000Hz, Q=1, shaped by sin(t*PI), 0.15s, vol 0.2
 Object.assign(SFX, {
-  // Move/Place piece
-  move() {
-    const { osc, gain, ctx } = audio.createOscillator('sine', 440);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.05);
-  },
-
-  // Score points - rising tone
-  score() {
-    const { osc, gain, ctx } = audio.createOscillator('sine', 523);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    osc.frequency.setValueAtTime(523, ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(784, ctx.currentTime + 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.2);
-  },
-
-  // Big score - arpeggio
-  bigScore() {
-    if (!audio.ctx) return;
-
-    const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
-    notes.forEach((freq, i) => {
-      const { osc, gain, ctx } = audio.createOscillator('sine', freq);
-      const startTime = ctx.currentTime + (i * 0.08);
-
-      gain.gain.setValueAtTime(0.1, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.2);
-    });
-  },
-
-  // Combo hit - pitch increases with combo
-  combo(comboCount) {
-    const baseFreq = 400;
-    const freq = baseFreq + (comboCount * 50); // Higher pitch for higher combo
-    const { osc, gain, ctx } = audio.createOscillator('triangle', freq);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.1);
-  },
-
-  // Collect/Pickup
-  collect() {
-    const { osc, gain, ctx } = audio.createOscillator('sine', 880);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.15);
-  },
-});
-```
-
-### Feedback Sounds
-
-```javascript
-Object.assign(SFX, {
-  // Success/Correct
-  success() {
-    if (!audio.ctx) return;
-
-    const notes = [523, 659, 784]; // C, E, G major chord
-    notes.forEach((freq, i) => {
-      const { osc, gain, ctx } = audio.createOscillator('sine', freq);
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.3);
-    });
-  },
-
-  // Error/Wrong
-  error() {
-    const { osc, gain, ctx } = audio.createOscillator('sawtooth', 150);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.3);
-  },
-
-  // Warning/Alert
-  warning() {
-    if (!audio.ctx) return;
-
-    for (let i = 0; i < 2; i++) {
-      const { osc, gain, ctx } = audio.createOscillator('square', 440);
-      const startTime = ctx.currentTime + (i * 0.15);
-
-      gain.gain.setValueAtTime(0.05, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.1);
-    }
-  },
-
-  // Game Over
-  gameOver() {
-    if (!audio.ctx) return;
-
-    const notes = [392, 349, 330, 294]; // G4, F4, E4, D4 - descending
-    notes.forEach((freq, i) => {
-      const { osc, gain, ctx } = audio.createOscillator('sine', freq);
-      const startTime = ctx.currentTime + (i * 0.2);
-
-      gain.gain.setValueAtTime(0.1, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.3);
-    });
-  },
-
-  // Victory/Win
-  victory() {
-    if (!audio.ctx) return;
-
-    const melody = [523, 523, 523, 698, 880]; // Fanfare
-    const durations = [0.1, 0.1, 0.1, 0.15, 0.4];
-    let time = audio.ctx.currentTime;
-
-    melody.forEach((freq, i) => {
-      const { osc, gain, ctx } = audio.createOscillator('triangle', freq);
-
-      gain.gain.setValueAtTime(0.1, time);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + durations[i]);
-
-      osc.start(time);
-      osc.stop(time + durations[i]);
-
-      time += durations[i] + 0.05;
-    });
-  },
-
-  // Level Up
-  levelUp() {
-    if (!audio.ctx) return;
-
-    const notes = [523, 659, 784, 1047]; // C major arpeggio up
-    notes.forEach((freq, i) => {
-      const { osc, gain, ctx } = audio.createOscillator('triangle', freq);
-      const startTime = ctx.currentTime + (i * 0.1);
-
-      gain.gain.setValueAtTime(0.1, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.3);
-    });
-  },
-
-  // Achievement Unlocked
-  achievement() {
-    if (!audio.ctx) return;
-
-    // Sparkle effect
-    const notes = [1047, 1319, 1568, 2093]; // High notes
-    notes.forEach((freq, i) => {
-      const { osc, gain, ctx } = audio.createOscillator('sine', freq);
-      const startTime = ctx.currentTime + (i * 0.05);
-
-      gain.gain.setValueAtTime(0.06, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.2);
-    });
-  },
-});
-```
-
-### Special Effect Sounds
-
-```javascript
-Object.assign(SFX, {
-  // Explosion
   explosion() {
     if (!audio.ctx) return;
-
-    // Noise burst
     const bufferSize = audio.ctx.sampleRate * 0.3;
     const buffer = audio.ctx.createBuffer(1, bufferSize, audio.ctx.sampleRate);
     const data = buffer.getChannelData(0);
-
     for (let i = 0; i < bufferSize; i++) {
       data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
     }
-
     const noise = audio.ctx.createBufferSource();
     const filter = audio.ctx.createBiquadFilter();
     const gain = audio.ctx.createGain();
-
     noise.buffer = buffer;
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(1000, audio.ctx.currentTime);
     filter.frequency.exponentialRampToValueAtTime(100, audio.ctx.currentTime + 0.3);
-
     gain.gain.setValueAtTime(0.3, audio.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, audio.ctx.currentTime + 0.3);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(audio.masterGain);
-
+    noise.connect(filter); filter.connect(gain); gain.connect(audio.masterGain);
     noise.start();
   },
 
-  // Whoosh/Swipe
   whoosh() {
     if (!audio.ctx) return;
-
     const bufferSize = audio.ctx.sampleRate * 0.15;
     const buffer = audio.ctx.createBuffer(1, bufferSize, audio.ctx.sampleRate);
     const data = buffer.getChannelData(0);
-
     for (let i = 0; i < bufferSize; i++) {
-      const t = i / bufferSize;
-      data[i] = (Math.random() * 2 - 1) * Math.sin(t * Math.PI) * 0.3;
+      data[i] = (Math.random() * 2 - 1) * Math.sin((i / bufferSize) * Math.PI) * 0.3;
     }
-
     const noise = audio.ctx.createBufferSource();
     const filter = audio.ctx.createBiquadFilter();
     const gain = audio.ctx.createGain();
-
     noise.buffer = buffer;
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(2000, audio.ctx.currentTime);
-    filter.Q.value = 1;
-
+    filter.type = 'bandpass'; filter.frequency.value = 2000; filter.Q.value = 1;
     gain.gain.setValueAtTime(0.2, audio.ctx.currentTime);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(audio.masterGain);
-
+    noise.connect(filter); filter.connect(gain); gain.connect(audio.masterGain);
     noise.start();
-  },
-
-  // Tick (timer)
-  tick() {
-    const { osc, gain, ctx } = audio.createOscillator('sine', 1000);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.03, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.02);
-  },
-
-  // Countdown beep
-  countdown(final = false) {
-    const freq = final ? 880 : 440;
-    const duration = final ? 0.3 : 0.1;
-    const { osc, gain, ctx } = audio.createOscillator('sine', freq);
-    if (!osc) return;
-
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + duration);
   },
 });
 ```

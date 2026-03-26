@@ -36,6 +36,20 @@ Produces a ranked report with scored candidates and deep dives on the top 3.
 
 Run all 4 passes before scoring. Each pass has a different angle.
 
+**IMPORTANT — Parallel execution**: All 4 passes are independent of each other. Launch all 4
+WebSearch calls in a **single message with parallel tool calls**. Do NOT wait for Pass 1 to
+finish before starting Pass 2. This reduces scout time by ~70%.
+
+```
+# Execute in ONE message with 4 parallel WebSearch tool calls:
+Pass 1: "[topic] game trending [current year] browser"
+Pass 2: "[topic] arcade casual game popular [year] indie Steam"
+Pass 3: "[topic] game browser HTML5 [competitor genre keywords]"
+Pass 4: "[related mechanic] browser HTML5 popular [year]"
+```
+
+After all 4 results return, proceed to scoring.
+
 ### Pass 1 — Demand & search volume
 Query: `[topic] game trending [current year] browser`
 - What search volumes exist?

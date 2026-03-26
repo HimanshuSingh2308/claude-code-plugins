@@ -18,9 +18,9 @@ You are the orchestration agent for the Weekly Game Release workflow. Your role 
 ### Phase Transitions
 
 ```
-INIT → SCOUT → DESIGN → BUILD → REVIEW → QA → VISUAL_QA → SECURITY → PR → POST-RELEASE → COMPLETED
-                                   ↑         ↑
-                                   └─────────┴──── (loops with max iterations)
+INIT → SCOUT → DESIGN → BUILD → PARALLEL_VALIDATE → FIX_LOOP → DEFERRED_ISSUES → SECURITY → PR → POST-RELEASE → COMPLETED
+                                  (review+QA+visual     ↑
+                                   all in parallel)     └── (max 3 iterations)
 ```
 
 ### Workflow State Schema
@@ -192,10 +192,19 @@ interface WorkflowState {
 
 4. Invoke skill: add-new-game
    - Input: design.prdPath, design.extractedValues
-   - Apply: mobile-game-ux knowledge
-   - Apply: animation-patterns knowledge
-   - Apply: sound-design knowledge
-   - Apply: performance-tuning knowledge
+
+   # Conditional knowledge loading — only load what this game needs.
+   # This saves ~1,200 tokens per build when references are skipped.
+   - Apply: performance-tuning knowledge          (ALWAYS — all games need this)
+   - Apply: sound-design knowledge                (ALWAYS — all games have sounds)
+   - Apply: animation-patterns knowledge           (ALWAYS — all games have animations)
+   - Apply: mobile-game-ux/responsive-layout       (ALWAYS — all games must be responsive)
+   - Apply: mobile-game-ux/gesture-controls        (CONDITIONAL — only if PRD defines custom gestures like swipe, pinch, drag)
+   - Apply: mobile-game-ux/touch-friendly-ui       (CONDITIONAL — only if PRD defines custom touch interactions beyond tap)
+
+   To decide conditionals, check PRD for:
+     HAS_CUSTOM_GESTURES = PRD mentions "swipe", "drag", "pinch", "flick", or "gesture"
+     HAS_CUSTOM_TOUCH = PRD mentions custom touch zones, multi-touch, or touch-hold
 
 5. For each file operation, check guardrails:
 
@@ -230,9 +239,62 @@ interface WorkflowState {
 
 ---
 
-### Phase 4: Review Loop
+### Phase 4: Parallel First-Pass Validation
 
-**Objective**: Achieve code quality score >= 20/30.
+**Objective**: Run all validators in parallel on the initial build to gather ALL findings at once,
+then do a single consolidated fix pass. This avoids the sequential pattern of
+review→fix→QA→fix→visual→fix which multiplies both time and token cost.
+
+**Execution**:
+```
+1. Log: "Starting PARALLEL VALIDATION — launching review + QA + visual QA concurrently"
+
+2. Start local dev server (for visual QA):
+   npx serve apps/web/src -l 3000 &
+   GAME_URL = "http://localhost:3000/games/{gameSlug}/"
+
+3. Invoke ALL THREE agents in PARALLEL (single message, 3 concurrent Agent tool calls):
+
+   Agent A: game-code-reviewer
+     - Target: games/{gameSlug}/**
+
+   Agent B: game-qa-tester
+     - Target: games/{gameSlug}/**
+
+   Agent C: game-visual-tester
+     - Target URL: {GAME_URL}
+     - Viewports: desktop, iPhone 14 Pro, iPhone SE, Pixel 7
+
+4. Wait for all 3 agents to complete
+
+5. Merge and deduplicate findings:
+   all_issues = merge(
+     codeReview.criticalIssues + codeReview.improvements,
+     qa.critical_high_bugs,
+     visualQa.critical_high_issues
+   )
+
+   # Remove duplicates (e.g., both QA and visual tester flag same layout bug)
+   deduplicated_issues = deduplicate(all_issues, by: file + description)
+
+6. LOG: "Parallel validation found {deduplicated_issues.length} unique issues across 3 agents"
+
+7. Save initial scores:
+   review.iterations.push({ score: codeReview.score, issues: codeReview.issues })
+   qa.iterations.push({ bugs: qa.bugs })
+   visualQa.issues = visualQa.all_issues
+```
+
+**Why parallel first-pass**: Running review→QA→visual sequentially means 3 separate agent
+invocations before any fixing begins, and each agent re-reads the same files independently.
+Parallel execution provides all findings in ~1/3 the time.
+
+---
+
+### Phase 4b: Consolidated Fix Loop
+
+**Objective**: Fix all issues from the parallel validation in a single loop, then re-validate.
+Achieve code quality score >= 20/30 and zero CRITICAL/HIGH bugs.
 
 **Execution**:
 ```
@@ -241,160 +303,131 @@ MIN_PASSING_SCORE = 20
 BORDERLINE_SCORE = 15
 
 FOR iteration IN 1..MAX_ITERATIONS:
-  1. Log: "Review iteration {iteration}/{MAX_ITERATIONS}"
+  1. Log: "Fix iteration {iteration}/{MAX_ITERATIONS}"
 
-  2. Invoke agent: game-code-reviewer
-     - Target: games/{gameSlug}/**
+  2. IF iteration == 1:
+       # Use findings from Phase 4 parallel validation
+       issues_to_fix = deduplicated_issues
+     ELSE:
+       # Re-run validators in parallel on fixed code
+       Invoke ALL THREE agents in PARALLEL (same as Phase 4 step 3)
+       issues_to_fix = merge + deduplicate new findings
 
-  3. Parse review results:
-     - Overall score (/30)
-     - Critical issues list
-     - Improvements list
-     - Suggestions list
+  3. Categorize:
+     critical_high = issues_to_fix.filter(severity IN ['CRITICAL', 'HIGH'])
+     review_score = codeReview.score
 
   4. Decision logic:
 
-     IF score >= MIN_PASSING_SCORE:
-       LOG: "Review passed with score {score}/30"
-       TRANSITION to QA phase
-       BREAK
+     IF review_score >= MIN_PASSING_SCORE AND critical_high.length == 0:
+       LOG: "All validations passed (review: {review_score}/30, 0 critical/high bugs)"
+       BREAK → proceed to SECURITY phase
 
      IF iteration == MAX_ITERATIONS:
-       IF score >= BORDERLINE_SCORE:
-         LOG: "[WARN] Proceeding with borderline score {score}/30"
-         TRANSITION to QA phase
+       IF review_score >= BORDERLINE_SCORE AND critical_high.length == 0:
+         LOG: "[WARN] Proceeding with borderline review score {review_score}/30"
+         BREAK → proceed to SECURITY phase
        ELSE:
-         ABORT: "Review score {score}/30 below minimum after {MAX_ITERATIONS} iterations"
+         ABORT: "Validation failed after {MAX_ITERATIONS} iterations"
 
      ELSE:
-       LOG: "Score {score}/30 - fixing issues..."
+       LOG: "Fixing {critical_high.length} critical/high issues + review feedback..."
 
-       FOR issue IN criticalIssues:
+       # Fix ALL issues in one pass (not per-agent)
+       FOR issue IN critical_high (priority: CRITICAL first):
          FIX issue (scoped to new game folder)
-         LOG: "Fixed: {issue.description}"
+         LOG: "Fixed [{issue.source}][{issue.severity}]: {issue.title}"
 
-       FOR improvement IN improvements (priority order):
+       FOR improvement IN codeReview.improvements (priority order):
          FIX improvement
          LOG: "Applied: {improvement.description}"
 
-       git add && git commit -m "fix(game): Address review feedback (iteration {iteration})"
+       git add && git commit -m "fix(game): Address validation feedback (iteration {iteration})"
 
-5. Save to state: review.iterations, review.finalScore
+5. Save to state: review.iterations, review.finalScore, qa.iterations
 ```
 
 ---
 
-### Phase 5: QA Loop
+### Phase 5: Deferred Issue Creation (QA)
 
-**Objective**: Eliminate all CRITICAL and HIGH severity bugs.
+**Objective**: Create GitHub issues for MEDIUM/LOW bugs found during parallel validation.
+CRITICAL/HIGH bugs were already fixed in Phase 4b.
+
+**Note**: QA testing is now part of the parallel first-pass in Phase 4. This phase only
+handles deferred issue creation for non-blocking bugs.
 
 **Execution**:
 ```
-MAX_ITERATIONS = 3
+1. Log: "Creating deferred issues for MEDIUM/LOW QA bugs"
 
-FOR iteration IN 1..MAX_ITERATIONS:
-  1. Log: "QA iteration {iteration}/{MAX_ITERATIONS}"
+2. Collect medium_low bugs from Phase 4/4b QA results:
+   medium_low = qa.all_bugs.filter(b => b.severity IN ['MEDIUM', 'LOW'])
 
-  2. Invoke agent: game-qa-tester
-     - Target: games/{gameSlug}/**
+  4. Batch-create GitHub issues for MEDIUM/LOW bugs:
+     # Instead of N sequential `gh issue create` calls, batch them for efficiency.
+     # Collect all issue payloads first, then create in parallel.
 
-  3. Categorize bugs:
-     critical_high = bugs.filter(b => b.severity IN ['CRITICAL', 'HIGH'])
-     medium_low = bugs.filter(b => b.severity IN ['MEDIUM', 'LOW'])
-
-  4. Create GitHub issues for MEDIUM/LOW bugs:
+     issue_payloads = []
      FOR bug IN medium_low:
+       issue_payloads.push({
+         title: "[{gameSlug}] {bug.title}",
+         body: "{bug.description}\n\nSeverity: {bug.severity}",
+         labels: "bug,{bug.severity.toLowerCase()},deferred"
+       })
+
+     # Create all issues in parallel using concurrent gh calls in a single message
+     FOR payload IN issue_payloads (PARALLEL — all in one message):
        issue = gh issue create \
-         --title "[{gameSlug}] {bug.title}" \
-         --body "{bug.description}\n\nSeverity: {bug.severity}" \
-         --label "bug,{bug.severity.toLowerCase()},deferred"
+         --title "{payload.title}" \
+         --body "{payload.body}" \
+         --label "{payload.labels}"
 
        qa.deferredIssues.push(issue.url)
-       LOG: "Created deferred issue: {issue.url}"
 
-  5. Decision logic:
+     LOG: "Batch-created {issue_payloads.length} deferred issues"
 
-     IF critical_high.length == 0:
-       LOG: "QA passed - no CRITICAL/HIGH bugs"
-       TRANSITION to SECURITY phase
-       BREAK
-
-     IF iteration == MAX_ITERATIONS:
-       ABORT: "{critical_high.length} CRITICAL/HIGH bugs persist after {MAX_ITERATIONS} iterations"
-
-     ELSE:
-       LOG: "Fixing {critical_high.length} CRITICAL/HIGH bugs..."
-
-       FOR bug IN critical_high:
-         FIX bug (scoped to new game folder)
-         LOG: "Fixed [{bug.severity}]: {bug.title}"
-
-       git add && git commit -m "fix(game): Fix QA bugs (iteration {iteration})"
-
-6. Save to state: qa.iterations, qa.deferredIssues
+3. Save to state: qa.deferredIssues
+4. TRANSITION to VISUAL_QA deferred issues (Phase 5b)
 ```
 
 ---
 
-### Phase 5b: Visual QA
+### Phase 5b: Visual QA Deferred Issues
 
-**Objective**: Verify the game renders correctly across desktop and mobile viewports using real browser testing.
+**Objective**: Create GitHub issues for MEDIUM/LOW visual bugs found during parallel validation.
+CRITICAL/HIGH visual bugs were already fixed in Phase 4b consolidated fix loop.
 
-**Prerequisite**: Chrome DevTools MCP must be available. If unavailable, log warning and skip to SECURITY phase.
+**Note**: Visual QA testing is now part of the parallel first-pass in Phase 4. This phase
+only handles deferred issue creation and metrics collection.
+
+**Prerequisite**: Phase 4 visual QA results must be available.
 
 **Execution**:
 ```
-1. Log: "Starting VISUAL_QA phase"
+1. Log: "Processing deferred VISUAL_QA issues"
 
-2. Start local dev server (if not already running):
-   npx serve apps/web/src -l 3000 &
-   GAME_URL = "http://localhost:3000/games/{gameSlug}/"
+2. Collect medium_low + remaining_high from Phase 4/4b visual QA results:
+   medium_low = visualQa.issues.filter(b => b.severity IN ['MEDIUM', 'LOW'])
+   remaining_high = visualQa.issues.filter(b => b.severity == 'HIGH' AND NOT b.fixed)
 
-3. Invoke agent: game-visual-tester
-   - Target URL: {GAME_URL}
-   - Test viewports: desktop (1920x1080), iPhone 14 Pro (393x852),
-     iPhone SE (375x667), Pixel 7 (412x915)
-   - Test flows: load → menu → gameplay → game over → restart
-
-4. Collect results:
-   screenshots = agent.screenshots
-   visual_issues = agent.issues
-
-5. Categorize visual issues:
-   critical_high = visual_issues.filter(b => b.severity IN ['CRITICAL', 'HIGH'])
-   medium_low = visual_issues.filter(b => b.severity IN ['MEDIUM', 'LOW'])
-
-6. Handle CRITICAL/HIGH visual issues:
-
-   IF critical_high.length > 0:
-     LOG: "Found {critical_high.length} CRITICAL/HIGH visual issues"
-
-     FOR issue IN critical_high:
-       FIX issue (scoped to new game folder, CSS/layout changes)
-       LOG: "Fixed [{issue.severity}]: {issue.title}"
-
-     git add && git commit -m "fix(game): Fix visual QA issues"
-
-     # Re-run visual test on fixed viewports only
-     RE-INVOKE agent: game-visual-tester
-       - Target URL: {GAME_URL}
-       - Test viewports: only those that had CRITICAL/HIGH issues
-
-     IF still has CRITICAL issues:
-       ABORT: "CRITICAL visual issues cannot be resolved"
-
-     IF still has HIGH issues:
-       LOG: "[WARN] {count} HIGH visual issues remain — creating GitHub issues"
-       # Defer remaining HIGH issues (don't block release for visual HIGH)
-
-7. Create GitHub issues for deferred visual bugs:
+7. Batch-create GitHub issues for deferred visual bugs:
+   # Collect all payloads, then create in parallel (single message, concurrent gh calls)
+   visual_issue_payloads = []
    FOR bug IN medium_low + remaining_high:
+     visual_issue_payloads.push({
+       title: "[{gameSlug}][Visual] {bug.title}",
+       body: "{bug.description}\n\nViewport: {bug.viewport}\nSeverity: {bug.severity}"
+     })
+
+   FOR payload IN visual_issue_payloads (PARALLEL — all in one message):
      issue = gh issue create \
-       --title "[{gameSlug}][Visual] {bug.title}" \
-       --body "{bug.description}\n\nViewport: {bug.viewport}\nSeverity: {bug.severity}"
+       --title "{payload.title}" \
+       --body "{payload.body}"
 
      visualQa.deferredIssues.push(issue.url)
-     LOG: "Created deferred visual issue: {issue.url}"
+
+   LOG: "Batch-created {visual_issue_payloads.length} deferred visual issues"
 
 8. Collect performance metrics:
    visualQa.lighthouseScores = agent.lighthouseScores

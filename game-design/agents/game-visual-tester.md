@@ -72,9 +72,9 @@ You rely on Chrome DevTools MCP tools:
    - Verify game over screen layout, score display, restart option
 ```
 
-### Phase 3: Mobile Testing
+### Phase 3: Mobile Testing (Parallel Viewports)
 
-Test on these viewports in order:
+Test on these viewports:
 
 | Device | Width | Height | DPR | Priority |
 |--------|-------|--------|-----|----------|
@@ -82,6 +82,19 @@ Test on these viewports in order:
 | iPhone SE | 375 | 667 | 2 | HIGH |
 | Pixel 7 | 412 | 915 | 2.625 | MEDIUM |
 | iPad Mini | 768 | 1024 | 2 | LOW |
+
+**Parallel viewport strategy**: When testing multiple viewports, batch the screenshot
+captures. For each game state (load, menu, gameplay, game over), cycle through ALL
+viewports before moving to the next state. This minimizes page reloads:
+
+```
+# Efficient: batch by game state (fewer reloads)
+FOR each game_state IN [load, menu, gameplay, game_over]:
+  FOR each device IN [iPhone 14 Pro, iPhone SE, Pixel 7, iPad Mini]:
+    emulate(device) → screenshot("{state}-{device}.png")
+
+# Avoid: testing each device end-to-end (4x page reloads per state)
+```
 
 For each mobile device:
 
