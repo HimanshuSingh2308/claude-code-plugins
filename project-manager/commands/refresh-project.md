@@ -52,6 +52,8 @@ Before scanning, read the existing knowledge file at:
 ~/.claude/projects/{sanitized-path}/memory/project_knowledge.md
 ```
 
+Where `{sanitized-path}` is the project path with `/` replaced by `-` and leading `-` removed (e.g., `/Users/hsingh1/Documents/weekly-arcade` → `-Users-hsingh1-Documents-weekly-arcade`).
+
 Compare what's changed since the last scan:
 - Check `scannedAt` timestamp in the frontmatter
 - Use `git log --oneline --since={scannedAt}` to see commits since last scan
@@ -125,14 +127,18 @@ Rewrite `~/.claude/projects/{sanitized-path}/memory/project_knowledge.md` with:
 | Branch changed | main → feature/new-game |
 ```
 
-### Step 6: Update Registry
+### Step 6: Update Memory Index
+
+Update `~/.claude/projects/{sanitized-path}/memory/MEMORY.md` to include a pointer to the knowledge file if not already present.
+
+### Step 7: Update Registry
 
 Update `~/.claude/project-registry.json`:
 - Bump `lastAccessed`
 - Update `techStack` if changed
 - Set `hasKnowledgeCache: true`
 
-### Step 7: Present Diff Summary
+### Step 8: Present Diff Summary
 
 Show the user what changed:
 
