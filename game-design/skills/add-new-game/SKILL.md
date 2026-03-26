@@ -75,50 +75,10 @@ Single self-contained HTML file. Follow all sections below exactly.
 
 ### 2.1 Head — SEO, OG, structured data
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GAME_NAME | Weekly Arcade - SHORT_TAGLINE</title>
-  <meta name="description" content="FULL_DESCRIPTION. No download required.">
-  <meta name="keywords" content="GAME_KEYWORDS, browser game, free game, no download">
-  <link rel="canonical" href="https://weekly-arcade.web.app/games/GAME_SLUG/">
-  <meta property="og:title" content="GAME_NAME | Weekly Arcade">
-  <meta property="og:description" content="GAME_OG_DESC">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://weekly-arcade.web.app/games/GAME_SLUG/">
-  <meta property="og:image" content="https://weekly-arcade.web.app/og-image.png">
-  <meta property="og:site_name" content="Weekly Arcade">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="GAME_NAME | Weekly Arcade">
-  <meta name="twitter:description" content="GAME_OG_DESC">
-  <meta name="twitter:image" content="https://weekly-arcade.web.app/og-image.png">
-  <meta name="theme-color" content="GAME_THEME_COLOR">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "VideoGame",
-    "name": "GAME_NAME",
-    "url": "https://weekly-arcade.web.app/games/GAME_SLUG/",
-    "description": "FULL_DESCRIPTION",
-    "genre": GAME_GENRE_ARRAY,
-    "playMode": "SinglePlayer",
-    "applicationCategory": "Game",
-    "operatingSystem": "Web Browser",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-    "breadcrumb": {
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": "Weekly Arcade", "item": "https://weekly-arcade.web.app/" },
-        { "@type": "ListItem", "position": 2, "name": "GAME_NAME", "item": "https://weekly-arcade.web.app/games/GAME_SLUG/" }
-      ]
-    }
-  }
-  </script>
-</head>
-```
+**Full template is in `references/game-ui-library.md`** under "HTML Head Template" section — copy
+that block and replace all `GAME_*` placeholders with PRD values.
+
+Customization: add extra `<meta>` tags if the game has unique SEO needs (e.g. `game:section`).
 
 ---
 
@@ -170,37 +130,14 @@ window.addEventListener('authStateChanged', (e) => {
 
 ### 2.9 Game-over / round-end sequence
 
-Call these functions in the correct order when a session ends:
+**Full template is in `references/game-ui-library.md`** under "Game-Over / Round-End Sequence" —
+copy the `onGameEnd()` function and customize per the listed customization points.
 
-```javascript
-function onGameEnd(won, scoreValue, extras = {}) {
-  // 1. Sound
-  playSound(won ? 'win' : 'fail');
-
-  // 2. Confetti on win
-  if (won) showConfetti();
-
-  // 3. Check achievements — returns new IDs
-  const newAchievements = checkAchievements({
-    won,
-    score: scoreValue,
-    // pass whatever fields your checkAchievements uses
-  });
-
-  // 4. Add XP
-  const xpEarned = won ? Math.round(scoreValue / 10) : 25;
-  addXP(xpEarned);
-
-  // 5. Show achievement toasts (staggered)
-  showNewAchievements(newAchievements);
-
-  // 6. Submit score to cloud
-  submitScoreToCloud(scoreValue, extras);
-
-  // 7. Show game-over UI (your own modal/overlay)
-  showGameOverModal(won, scoreValue);
-}
-```
+Key things to adapt per game:
+- XP formula (divisor and consolation amount)
+- Win condition (some games are score-only, no binary win/lose)
+- Extra `gameData` fields passed to `checkAchievements`
+- Any game-specific end-of-round actions after step 6
 
 ---
 

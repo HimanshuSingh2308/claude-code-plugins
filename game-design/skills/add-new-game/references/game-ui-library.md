@@ -351,3 +351,104 @@ async function submitScoreToCloud(scoreValue, extras = {}) {
   }
 }
 ```
+
+---
+
+## HTML Head Template — SEO, OG, Structured Data
+
+Copy into every game's `<head>`. Replace all `GAME_*` placeholders with PRD values.
+
+**Customization points** (after copying):
+- `GAME_NAME`, `GAME_SLUG`, `GAME_THEME_COLOR`, `GAME_KEYWORDS`, `GAME_OG_DESC` — from PRD
+- `GAME_GENRE_ARRAY` — JSON array of genre strings from PRD
+- `FULL_DESCRIPTION` — longer description for meta + JSON-LD (can differ from card desc)
+- `SHORT_TAGLINE` — brief tagline for `<title>` suffix
+- Add extra `<meta>` tags if the game has unique SEO needs (e.g. `game:section`)
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GAME_NAME | Weekly Arcade - SHORT_TAGLINE</title>
+  <meta name="description" content="FULL_DESCRIPTION. No download required.">
+  <meta name="keywords" content="GAME_KEYWORDS, browser game, free game, no download">
+  <link rel="canonical" href="https://weekly-arcade.web.app/games/GAME_SLUG/">
+  <meta property="og:title" content="GAME_NAME | Weekly Arcade">
+  <meta property="og:description" content="GAME_OG_DESC">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://weekly-arcade.web.app/games/GAME_SLUG/">
+  <meta property="og:image" content="https://weekly-arcade.web.app/og-image.png">
+  <meta property="og:site_name" content="Weekly Arcade">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="GAME_NAME | Weekly Arcade">
+  <meta name="twitter:description" content="GAME_OG_DESC">
+  <meta name="twitter:image" content="https://weekly-arcade.web.app/og-image.png">
+  <meta name="theme-color" content="GAME_THEME_COLOR">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    "name": "GAME_NAME",
+    "url": "https://weekly-arcade.web.app/games/GAME_SLUG/",
+    "description": "FULL_DESCRIPTION",
+    "genre": GAME_GENRE_ARRAY,
+    "playMode": "SinglePlayer",
+    "applicationCategory": "Game",
+    "operatingSystem": "Web Browser",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Weekly Arcade", "item": "https://weekly-arcade.web.app/" },
+        { "@type": "ListItem", "position": 2, "name": "GAME_NAME", "item": "https://weekly-arcade.web.app/games/GAME_SLUG/" }
+      ]
+    }
+  }
+  </script>
+</head>
+```
+
+---
+
+## Game-Over / Round-End Sequence
+
+Copy into every game. This is the standard 7-step end-of-round sequence.
+
+**Customization points** (after copying):
+- **XP formula**: `Math.round(scoreValue / 10)` is the default — adjust divisor per game feel
+- **Loss XP**: `25` is the consolation default — set to `0` for punishing games, higher for casual
+- **Win condition**: Some games don't have a binary win/lose — adapt the `won` parameter
+- **Extra gameData fields**: Pass whatever `checkAchievements` needs (e.g. `combo`, `timeMs`, `wave`)
+- **Custom end-of-round actions**: Add game-specific steps after step 6 (e.g. save replay, show stats)
+
+```javascript
+function onGameEnd(won, scoreValue, extras = {}) {
+  // 1. Sound
+  playSound(won ? 'win' : 'fail');
+
+  // 2. Confetti on win
+  if (won) showConfetti();
+
+  // 3. Check achievements — returns new IDs
+  const newAchievements = checkAchievements({
+    won,
+    score: scoreValue,
+    // pass whatever fields your checkAchievements uses
+  });
+
+  // 4. Add XP
+  const xpEarned = won ? Math.round(scoreValue / 10) : 25;
+  addXP(xpEarned);
+
+  // 5. Show achievement toasts (staggered)
+  showNewAchievements(newAchievements);
+
+  // 6. Submit score to cloud
+  submitScoreToCloud(scoreValue, extras);
+
+  // 7. Show game-over UI (your own modal/overlay)
+  showGameOverModal(won, scoreValue);
+}
+```
