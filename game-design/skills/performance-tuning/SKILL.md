@@ -8,15 +8,7 @@ description: >
 
 # Performance Tuning for Browser Games
 
-## Core Targets
-
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Frame Rate | 60 FPS | 16.67ms per frame |
-| Frame Budget | <12ms | Leave headroom for browser |
-| Memory | <100MB | Avoid GC pauses |
-| Load Time | <3s | First playable |
-| Input Latency | <100ms | Touch to response |
+**Targets**: 60 FPS (<12ms frame budget), <100MB memory, <3s load, <100ms input latency.
 
 ---
 
@@ -310,48 +302,10 @@ function spawnParticle(x, y) {
 
 ### Avoid Garbage Collection
 
-```javascript
-// BAD - Creates garbage every frame
-function update() {
-  const velocity = { x: 0, y: 0 }; // New object each frame!
-  velocity.x = player.vx;
-  velocity.y = player.vy;
-}
-
-// GOOD - Reuse objects
-const tempVec = { x: 0, y: 0 };
-function update() {
-  tempVec.x = player.vx;
-  tempVec.y = player.vy;
-}
-
-// BAD - Array methods create new arrays
-const activeEnemies = enemies.filter(e => e.alive);
-
-// GOOD - Modify in place
-let activeCount = 0;
-for (let i = 0; i < enemies.length; i++) {
-  if (enemies[i].alive) {
-    enemies[activeCount++] = enemies[i];
-  }
-}
-enemies.length = activeCount;
-```
-
-### Memory Monitoring
-
-```javascript
-function getMemoryUsage() {
-  if (performance.memory) {
-    return {
-      used: Math.round(performance.memory.usedJSHeapSize / 1048576),
-      total: Math.round(performance.memory.totalJSHeapSize / 1048576),
-      limit: Math.round(performance.memory.jsHeapSizeLimit / 1048576)
-    };
-  }
-  return null;
-}
-```
+- Reuse temp objects instead of allocating per frame (`const tempVec = {x:0, y:0}`)
+- Modify arrays in place instead of `.filter()` (swap+truncate pattern)
+- Pre-allocate with object pools (see above)
+- Monitor with `performance.memory.usedJSHeapSize` (Chrome only)
 
 ---
 

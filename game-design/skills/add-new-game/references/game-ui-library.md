@@ -1,10 +1,89 @@
 # Game UI Library — Shared Implementations
 
-Canonical implementations for sound, achievements, visual feedback, and XP/levels.
-These are the exact patterns used across all Weekly Arcade games.
+Canonical CSS and JS implementations for sound, achievements, visual feedback, XP/levels,
+and common UI components. These are the exact patterns used across all Weekly Arcade games.
 
 **Usage**: When `add-new-game` or any game integration skill needs these patterns,
 reference this file instead of duplicating the code inline.
+
+---
+
+## Required CSS — Achievement Toast, Confetti, Level-Up, Score Pop, Shake, Pulse
+
+Copy this block into the game's `<style>` section. Customise colours to match the game's theme.
+
+```css
+/* ── Achievement Toast ── */
+.achievement-toast {
+  position: fixed; top: 20px; right: -320px;
+  background: linear-gradient(135deg, #b59f3b, #8b7a2e);
+  padding: 1rem 1.5rem; border-radius: 12px;
+  display: flex; align-items: center; gap: 1rem;
+  z-index: 2000; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  transition: right 0.35s ease; max-width: 300px;
+}
+.achievement-toast.show { right: 20px; }
+.achievement-icon { font-size: 2rem; }
+.achievement-info { color: #fff; }
+.achievement-name { font-weight: 700; font-size: 1rem; }
+.achievement-desc { font-size: 0.8rem; opacity: 0.9; }
+
+/* ── Confetti ── */
+.confetti-container {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1500; overflow: hidden;
+}
+.confetti {
+  position: absolute; width: 10px; height: 10px; top: -10px;
+  animation: confettiFall 3s ease-out forwards;
+}
+@keyframes confettiFall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ── Level-Up Burst ── */
+.levelup-container {
+  position: fixed; inset: 0; pointer-events: none;
+  z-index: 1600; display: flex; align-items: center; justify-content: center;
+}
+.levelup-particle {
+  position: absolute; width: 8px; height: 8px; border-radius: 50%;
+  animation: levelupBurst 1s ease-out var(--delay, 0s) forwards;
+}
+@keyframes levelupBurst {
+  0%   { transform: rotate(var(--angle,0deg)) translateX(0); opacity: 1; }
+  100% { transform: rotate(var(--angle,0deg)) translateX(150px); opacity: 0; }
+}
+
+/* ── Score Pop ── */
+.score-pop {
+  position: fixed; pointer-events: none; z-index: 1400;
+  font-size: 1.4rem; font-weight: 900; color: #ffd700;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  animation: scorePop 1.2s ease-out forwards;
+}
+@keyframes scorePop {
+  0%   { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-80px); opacity: 0; }
+}
+
+/* ── Shake ── */
+.shake { animation: shake 0.5s; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%,60% { transform: translateX(-6px); }
+  40%,80% { transform: translateX(6px); }
+}
+
+/* ── Pulse ── */
+.pulse { animation: pulse 0.4s ease-out; }
+@keyframes pulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+```
 
 ---
 

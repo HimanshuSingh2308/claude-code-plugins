@@ -8,58 +8,8 @@ description: >
 
 # Animation Patterns for Browser Games
 
-## Core Principles
-
-1. **60fps or nothing**: Animations must be smooth
-2. **GPU-accelerated**: Use transform/opacity, avoid layout triggers
-3. **Purposeful**: Every animation reinforces gameplay feedback
-4. **Responsive**: Reduce motion for users who prefer it
-
----
-
-## CSS Animation Fundamentals
-
-### GPU-Accelerated Properties (USE THESE)
-
-```css
-/* GOOD - GPU accelerated */
-.animated {
-  transform: translateX(100px);
-  transform: scale(1.2);
-  transform: rotate(45deg);
-  opacity: 0.5;
-  filter: blur(5px);
-}
-
-/* BAD - Triggers layout/paint */
-.slow {
-  left: 100px;      /* Triggers layout */
-  width: 200px;     /* Triggers layout */
-  background: red;  /* Triggers paint */
-  box-shadow: ...;  /* Triggers paint */
-}
-```
-
-### Force GPU Layer
-
-```css
-.gpu-layer {
-  will-change: transform;
-  transform: translateZ(0); /* Fallback for older browsers */
-}
-```
-
-### Reduced Motion Support
-
-```css
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-```
+**Rules**: Only animate `transform`/`opacity` (GPU-accelerated). Use `will-change: transform` sparingly.
+Always include `@media (prefers-reduced-motion: reduce)` to disable animations.
 
 ---
 
@@ -546,10 +496,8 @@ Animate.countUp(scoreElement, 0, 1250, 500);
 
 ## Performance Tips
 
-1. **Use `transform` and `opacity`** - Only these are GPU-accelerated
-2. **Avoid layout thrashing** - Don't read then write in loops
-3. **Use `will-change` sparingly** - Only on elements about to animate
-4. **Prefer CSS animations** - They run on compositor thread
-5. **Use `requestAnimationFrame`** - Never `setInterval` for animations
-6. **Clean up** - Remove particles after animation completes
-7. **Batch DOM operations** - Use `DocumentFragment` for many elements
+- Only `transform`/`opacity` are GPU-accelerated — avoid `left`, `width`, `background`
+- `will-change` only on elements about to animate, remove after
+- Prefer CSS over JS animations (compositor thread)
+- Always `particle.remove()` after animation completes
+- Batch DOM inserts with `DocumentFragment`

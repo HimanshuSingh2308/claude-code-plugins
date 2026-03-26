@@ -25,90 +25,23 @@ INIT → SCOUT → DESIGN → BUILD → PARALLEL_VALIDATE → FIX_LOOP → DEFER
 
 ### Workflow State Schema
 
-```typescript
-interface WorkflowState {
-  id: string;                    // Format: YYYY-MM-DD-HHmmss
-  currentPhase: Phase;
-  startedAt: string;             // ISO timestamp
-  lastUpdated: string;
-  dryRun: boolean;
+State is persisted to `~/Documents/weekly-games/workflows/{id}.json`.
 
-  scout: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    reportPath?: string;
-    selectedGame?: {
-      concept: string;
-      score: number;
-      rationale: string;
-    };
-  };
+Each phase has: `status: 'pending' | 'running' | 'completed' | 'failed'`
 
-  design: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    prdPath?: string;
-    gameSlug?: string;
-    gameName?: string;
-    extractedValues?: Record<string, string>;
-  };
-
-  build: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    branchName?: string;
-    commits: string[];
-    filesCreated: string[];
-    filesModified: string[];
-  };
-
-  review: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    iterations: ReviewIteration[];
-    finalScore?: number;
-  };
-
-  qa: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    iterations: QAIteration[];
-    deferredIssues: string[];    // GitHub issue URLs
-  };
-
-  visualQa: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    viewportsTested: string[];         // e.g. ['desktop-1920x1080', 'iphone-14-pro', 'iphone-se']
-    screenshots: string[];             // paths to captured screenshots
-    issues: VisualIssue[];
-    deferredIssues: string[];          // GitHub issue URLs
-    lighthouseScores?: {
-      performance: number;
-      accessibility: number;
-    };
-    fpsDesktop?: number;
-    fpsMobile?: number;
-  };
-
-  security: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    assessment?: SecurityAssessment;
-    acceptedRisks: string[];
-  };
-
-  pr: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    prNumber?: number;
-    prUrl?: string;
-    merged: boolean;
-    mergeCommit?: string;
-  };
-
-  postRelease: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    releaseNotesPath?: string;
-    metrics?: WorkflowMetrics;
-  };
-
-  errors: WorkflowError[];
-  confirmations: ConfirmationLog[];
-}
-```
+| Phase | Key Fields |
+|-------|------------|
+| Root | `id` (YYYY-MM-DD-HHmmss), `currentPhase`, `startedAt`, `lastUpdated`, `dryRun` |
+| scout | `reportPath`, `selectedGame: { concept, score, rationale }` |
+| design | `prdPath`, `gameSlug`, `gameName`, `extractedValues` |
+| build | `branchName`, `commits[]`, `filesCreated[]`, `filesModified[]` |
+| review | `iterations: ReviewIteration[]`, `finalScore` |
+| qa | `iterations: QAIteration[]`, `deferredIssues: string[]` (GitHub URLs) |
+| visualQa | `viewportsTested[]`, `screenshots[]`, `issues[]`, `deferredIssues[]`, `lighthouseScores: {performance, accessibility}`, `fpsDesktop`, `fpsMobile` |
+| security | `assessment: SecurityAssessment`, `acceptedRisks[]` |
+| pr | `prNumber`, `prUrl`, `merged`, `mergeCommit` |
+| postRelease | `releaseNotesPath`, `metrics: WorkflowMetrics` |
+| Global | `errors: WorkflowError[]`, `confirmations: ConfirmationLog[]` |
 
 ---
 

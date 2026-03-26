@@ -9,9 +9,7 @@ description: >
 
 # CSS Game Art & Visual Design
 
-## Core Principle: Constraints Breed Creativity
-
-CSS-only games have a distinct charm. The constraint of "no images" forces clean, readable, scalable visuals that load instantly and look sharp on any screen.
+No images, no canvas — pure CSS divs, gradients, shadows, and pseudo-elements.
 
 ---
 
@@ -19,15 +17,9 @@ CSS-only games have a distinct charm. The constraint of "no images" forces clean
 
 ### The Universal Character Template
 
-Every CSS game character uses the same base structure:
-
 ```
-     [Hair/Hat]        ← ::before pseudo-element
-        (O)            ← Head: circle div
-       [  ]            ← Body: rounded rect div
-      /    \           ← Arms: small rects or pseudo-elements
-       ||  ||          ← Legs: thin rects (optional)
-     ~~~~~~            ← Shadow: radial-gradient ellipse
+[Hair/Hat] ← ::before    (O) ← Head: circle    [  ] ← Body: rounded rect
+/    \ ← Arms            ||  || ← Legs          ~~~~~~ ← Shadow: radial-gradient
 ```
 
 ### Head (16-24px circle)
@@ -89,106 +81,33 @@ Randomize skin tones for NPCs to add diversity.
 
 ### Hair Styles
 
-```css
-/* Short hair — arc on top of head */
-.hair-short::before {
-  content: '';
-  position: absolute;
-  top: -3px; left: 2px; right: 2px;
-  height: 8px;
-  background: var(--hair-color);
-  border-radius: 10px 10px 0 0;
-}
+All use `::before` pseudo-element on head. Pattern: `content:''; position:absolute; background:var(--hair-color);`
 
-/* Long hair — extends down sides */
-.hair-long::before {
-  content: '';
-  position: absolute;
-  top: -3px; left: -2px; right: -2px;
-  height: 20px;
-  background: var(--hair-color);
-  border-radius: 10px 10px 4px 4px;
-  z-index: -1;
-}
+| Style | Class | Position | Size | Border-radius | Extra |
+|-------|-------|----------|------|---------------|-------|
+| Short | `.hair-short` | top:-3px; left:2px; right:2px | h:8px | 10px 10px 0 0 | — |
+| Long | `.hair-long` | top:-3px; left:-2px; right:-2px | h:20px | 10px 10px 4px 4px | z-index:-1 |
+| Cap | `.hair-cap` | top:-6px; left:-3px; right:-3px | h:10px | 10px 10px 2px 2px | +`::after` brim: top:-2px; left:-6px; w:32px h:4px |
 
-/* Hat/cap */
-.hair-cap::before {
-  content: '';
-  position: absolute;
-  top: -6px; left: -3px; right: -3px;
-  height: 10px;
-  background: var(--hat-color);
-  border-radius: 10px 10px 2px 2px;
-}
-.hair-cap::after {
-  content: '';
-  position: absolute;
-  top: -2px; left: -6px;
-  width: 32px; height: 4px;
-  background: var(--hat-color);
-  border-radius: 2px;
-}
-```
+**Hair colors**: `#2C1810` black, `#5C3317` dark brown, `#8B6914` brown, `#D4A574` blonde, `#C0392B` red, `#E8E8E8` gray, `#FF69B4` pink, `#4A90D9` blue
 
-### Hair Color Palette
+### Accessories
 
-`#2C1810` (black), `#5C3317` (dark brown), `#8B6914` (brown), `#D4A574` (blonde), `#C0392B` (red), `#E8E8E8` (gray/white), `#FF69B4` (pink/dyed), `#4A90D9` (blue/dyed)
+All use `::before` or `::after` on body. Pattern: `content:''; position:absolute;`
 
-### Accessories (Differentiate Character Types)
+| Accessory | Class | Pseudo | Position | Size | Style |
+|-----------|-------|--------|----------|------|-------|
+| Tie | `.accessory-tie` | after | top:4px; left:50%; translateX(-50%) | 4×14px | `#C0392B`, clip-path: trapezoid |
+| Backpack | `.accessory-backpack` | before | top:4px; right:-6px | 8×14px | `#FF9800`, border-radius:2px |
+| Glasses | `.accessory-glasses` | after | top:6px; left:2px | 16×6px | border:2px solid #333, border-radius:50% |
+| Crown | `.accessory-crown` | before | top:-14px; center | emoji | `content:'👑'; font-size:12px` |
 
-```css
-/* Tie (business character) */
-.accessory-tie::after {
-  content: '';
-  position: absolute;
-  top: 4px; left: 50%;
-  transform: translateX(-50%);
-  width: 4px; height: 14px;
-  background: #C0392B;
-  clip-path: polygon(30% 0%, 70% 0%, 100% 100%, 0% 100%);
-}
-
-/* Backpack (student) */
-.accessory-backpack::before {
-  content: '';
-  position: absolute;
-  top: 4px; right: -6px;
-  width: 8px; height: 14px;
-  background: #FF9800;
-  border-radius: 2px;
-}
-
-/* Glasses */
-.accessory-glasses::after {
-  content: '';
-  position: absolute;
-  top: 6px; left: 2px;
-  width: 16px; height: 6px;
-  border: 2px solid #333;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.1);
-}
-
-/* Crown (VIP) */
-.accessory-crown::before {
-  content: '👑';
-  position: absolute;
-  top: -14px; left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-}
-```
-
-### Character Shadow (Grounding)
+### Character Shadow
 
 ```css
 .character-shadow {
-  position: absolute;
-  bottom: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 30px;
-  height: 8px;
+  position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
+  width: 30px; height: 8px;
   background: radial-gradient(ellipse, rgba(0,0,0,0.2) 0%, transparent 70%);
   pointer-events: none;
 }
@@ -196,48 +115,15 @@ Randomize skin tones for NPCs to add diversity.
 
 ### Character States
 
-```css
-/* Walking — vertical bob */
-@keyframes walkBob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-.character.walking { animation: walkBob 0.4s ease-in-out infinite; }
+All animations use GPU-accelerated `transform` only.
 
-/* Happy — bounce */
-@keyframes happyBounce {
-  0% { transform: translateY(0) scale(1); }
-  30% { transform: translateY(-12px) scale(1.05, 0.95); }
-  60% { transform: translateY(0) scale(0.95, 1.05); }
-  100% { transform: translateY(0) scale(1); }
-}
-.character.happy { animation: happyBounce 0.5s ease-out; }
-
-/* Angry — shake + red tint */
-@keyframes angryShake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-3px); }
-  75% { transform: translateX(3px); }
-}
-.character.angry {
-  animation: angryShake 0.15s ease-in-out 3;
-  filter: saturate(1.5) hue-rotate(-10deg);
-}
-
-/* Idle — subtle breathe */
-@keyframes idleBreathe {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(1.02); }
-}
-.character.idle { animation: idleBreathe 3s ease-in-out infinite; }
-
-/* Serving — arms forward */
-@keyframes serveArms {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(-25deg); }
-}
-.character.serving .arm { animation: serveArms 0.6s ease-in-out; }
-```
+| State | Keyframe | Duration | Property | Key Values |
+|-------|----------|----------|----------|------------|
+| Walking | `walkBob` | 0.4s infinite | translateY | 0 → -3px → 0 |
+| Happy | `happyBounce` | 0.5s once | translateY + scale | 0,1 → -12px,1.05/.95 → 0,1 |
+| Angry | `angryShake` | 0.15s ×3 | translateX | 0 → -3px → 3px → 0. Add `filter: saturate(1.5) hue-rotate(-10deg)` |
+| Idle | `idleBreathe` | 3s infinite | scaleY | 1 → 1.02 → 1 |
+| Serving | `serveArms` | 0.6s once | rotate (on `.arm`) | 0 → -25deg → 0 |
 
 ### Character Size Guide
 
@@ -252,74 +138,21 @@ Randomize skin tones for NPCs to add diversity.
 
 ## 2. Environment Design
 
-### Wall Techniques
+### Wall & Floor Techniques
 
-```css
-/* Basic painted wall */
-.wall {
-  background: linear-gradient(180deg, #D4B896 0%, #C8A87C 100%);
-}
+All surfaces use `linear-gradient` or `repeating-linear-gradient` layers. Pattern: base color gradient + optional texture overlay.
 
-/* Wainscoting (lower panel trim) */
-.wall::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 35%;
-  background: linear-gradient(180deg, #B89468, #A8845C);
-  border-top: 2px solid #96784E;
-}
+| Surface | Class | Technique | Key Colors |
+|---------|-------|-----------|------------|
+| Painted wall | `.wall` | gradient 180deg | `#D4B896` → `#C8A87C` |
+| Wainscoting | `.wall::after` | bottom 35%, border-top | `#B89468` → `#A8845C`, trim `#96784E` |
+| Wallpaper | `.wall-premium` | 45deg repeating + gradient | Gold `rgba(255,215,0,0.03)` overlay |
+| Brick | `.wall-brick` | H+V repeating 18/20px, 38/40px | Mortar `#8B6914`, base `#C8956E` |
+| Wood floor | `.floor-wood` | 90deg repeating planks 59/60px | `#B89468` → `#D4A87C` |
+| Tile floor | `.floor-tile` | H+V grid 39/40px | `#C89B6E` → `#D4A87C` |
+| Carpet | `.floor-carpet` | 135deg 4/8px subtle | `#3D2A5C` → `#4E3872` |
 
-/* Wallpaper pattern */
-.wall-premium {
-  background:
-    repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,215,0,0.03) 10px, rgba(255,215,0,0.03) 20px),
-    linear-gradient(180deg, #E8D5B7, #D4C4A0);
-}
-
-/* Brick wall */
-.wall-brick {
-  background:
-    repeating-linear-gradient(0deg, transparent, transparent 18px, #8B6914 18px, #8B6914 20px),
-    repeating-linear-gradient(90deg, transparent, transparent 38px, #8B6914 38px, #8B6914 40px),
-    #C8956E;
-}
-```
-
-### Floor Techniques
-
-```css
-/* Wood floor with plank lines */
-.floor-wood {
-  background:
-    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(0,0,0,0.08) 59px, rgba(0,0,0,0.08) 60px),
-    linear-gradient(180deg, #B89468, #D4A87C);
-}
-
-/* Tile floor */
-.floor-tile {
-  background:
-    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,0,0,0.05) 39px, rgba(0,0,0,0.05) 40px),
-    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,0,0,0.05) 39px, rgba(0,0,0,0.05) 40px),
-    linear-gradient(180deg, #C89B6E, #D4A87C);
-}
-
-/* Carpet (VIP/premium areas) */
-.floor-carpet {
-  background:
-    repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,255,255,0.02) 4px, rgba(255,255,255,0.02) 8px),
-    linear-gradient(180deg, #3D2A5C, #4E3872);
-}
-
-/* Depth gradient (darker at back, lighter at front) */
-.floor::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 100%);
-  pointer-events: none;
-}
-```
+**Depth**: Add `::before` with `linear-gradient(180deg, rgba(0,0,0,0.15), transparent)` on any floor for back-to-front depth.
 
 ### Counter / Furniture with 3D Effect
 
@@ -408,65 +241,12 @@ Randomize skin tones for NPCs to add diversity.
 
 ### Decorative Elements
 
-```css
-/* Menu board */
-.menu-board {
-  width: 80px; height: 50px;
-  background: #2C1810;
-  border-radius: 4px;
-  border: 2px solid #5C3317;
-  position: relative;
-}
-.menu-board-text {
-  color: #FFF8F0;
-  font-size: 8px;
-  font-weight: 700;
-  text-align: center;
-  padding-top: 6px;
-}
-
-/* Wall clock */
-.wall-clock {
-  width: 24px; height: 24px;
-  border-radius: 50%;
-  background: #FFF;
-  border: 2px solid #333;
-  position: relative;
-}
-.clock-hand {
-  position: absolute;
-  bottom: 50%; left: 50%;
-  width: 2px; height: 8px;
-  background: #333;
-  transform-origin: bottom center;
-  /* Rotate based on timer: 0→360 degrees over game duration */
-}
-
-/* Potted plant */
-.plant {
-  position: relative;
-}
-.plant-pot {
-  width: 14px; height: 10px;
-  background: #A0522D;
-  border-radius: 0 0 3px 3px;
-}
-.plant-leaves {
-  width: 20px; height: 14px;
-  background: radial-gradient(ellipse, #4CAF50, #2E7D32);
-  border-radius: 50%;
-  margin: -4px auto 0;
-}
-
-/* Framed picture */
-.picture-frame {
-  width: 24px; height: 18px;
-  border: 2px solid #8B6914;
-  background: linear-gradient(135deg, #87CEEB, #98D8C8);
-  border-radius: 1px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-```
+| Element | Size | Key Style | Notes |
+|---------|------|-----------|-------|
+| Menu board | 80×50px | bg:`#2C1810`, border:2px `#5C3317` | White text 8px centered |
+| Wall clock | 24×24px circle | bg:white, border:2px `#333` | Rotate hand via `transform-origin:bottom center` |
+| Potted plant | pot:14×10px, leaves:20×14px | pot:`#A0522D`, leaves:`radial-gradient(#4CAF50, #2E7D32)` | Overlap leaves -4px above pot |
+| Framed picture | 24×18px | border:2px `#8B6914`, gradient fill | box-shadow for depth |
 
 ---
 
