@@ -37,8 +37,10 @@ apps/web/src/
     game-header.js             ← Shared header component + auto-auth (DO NOT MODIFY)
 packages/shared/src/
   lib/types/leaderboard.types.ts   ← SubmitScoreDto shape
+  lib/types/achievement.types.ts   ← AchievementCategory type (ADD GAME SLUG)
   lib/constants/scoring.ts         ← SCORING constants, helpers
   lib/constants/game-registry.ts   ← GAME_REGISTRY — single source of truth for all games (ADD ENTRY)
+  lib/constants/achievements.ts    ← ACHIEVEMENTS registry — all achievement IDs (ADD ENTRIES)
 ```
 
 ---
@@ -341,7 +343,49 @@ After editing, rebuild shared: `npx nx run shared:build`
 
 ---
 
-## Phase 5: Update `apps/web/src/sitemap.xml`
+## Phase 5: Register Achievements in Backend
+
+**File:** `packages/shared/src/lib/constants/achievements.ts`
+
+Add all game achievements to the `ACHIEVEMENTS` record. The backend validates
+achievement IDs on unlock — any ID not in this file returns 400 "Unknown achievement".
+
+```typescript
+  // ============ GAME_NAME ACHIEVEMENTS ============
+  GAME_SLUG_first: {
+    id: 'GAME_SLUG_first',
+    name: 'First Game',
+    description: 'Complete your first game',
+    icon: '🎯',
+    xpReward: 100,
+    category: 'GAME_SLUG',    // Must match AchievementCategory type
+    requirement: { type: 'first_game', gameId: 'GAME_SLUG' },
+  },
+  // ... add all achievements from the PRD
+```
+
+**Also update the category type** if this is a new game:
+
+**File:** `packages/shared/src/lib/types/achievement.types.ts`
+
+Add the game slug to the `AchievementCategory` union:
+
+```typescript
+export type AchievementCategory =
+  | 'gameplay'
+  | 'streak'
+  // ... existing categories
+  | 'GAME_SLUG';    // ← add this
+```
+
+**Achievement ID convention:** prefix all IDs with the game slug to avoid collisions.
+E.g., `tt_first_day`, `tt_combo_5` for Tiny Tycoon.
+
+After editing both files, rebuild: `npx nx run shared:build`
+
+---
+
+## Phase 6: Update `apps/web/src/sitemap.xml`
 
 Add after the last `<url>` game block:
 
@@ -361,11 +405,13 @@ Bump all other game entries from `0.9` → `0.8` if any currently sit at `0.9`.
 ## Execution Order
 
 1. Extract all `GAME_*` variables from the PRD
-2. Create `apps/web/src/games/GAME_SLUG/index.html` (full game using `game-cloud.js`)
+2. Create `apps/web/src/games/GAME_SLUG/index.html` (full game)
 3. Edit `packages/shared/src/lib/constants/game-registry.ts` — add GAME_REGISTRY entry
-4. Edit `apps/web/src/index.html` — all 6 changes
-5. Edit `apps/web/src/sitemap.xml` — URL entry
-6. Rebuild shared: `npx nx run shared:build`
+4. Edit `packages/shared/src/lib/constants/achievements.ts` — register all achievements
+5. Edit `packages/shared/src/lib/types/achievement.types.ts` — add category to union type
+6. Edit `apps/web/src/index.html` — all 6 changes
+7. Edit `apps/web/src/sitemap.xml` — URL entry
+8. Rebuild shared: `npx nx run shared:build`
 
 ---
 
@@ -385,6 +431,9 @@ Bump all other game entries from `0.9` → `0.8` if any currently sit at `0.9`.
 - [ ] Cloud state uses `gameCloud.loadState()` / `saveState()` (NOT raw apiClient)
 - [ ] Achievements use `gameCloud.unlockAchievement()` (NOT raw apiClient)
 - [ ] gameId in all calls exactly matches GAME_SLUG
+- [ ] All achievement IDs registered in `packages/shared/src/lib/constants/achievements.ts`
+- [ ] Game slug added to `AchievementCategory` in `achievement.types.ts`
+- [ ] Achievement IDs prefixed with game slug (e.g., `tt_combo_5`, not `combo_5`)
 
 **Game Content:**
 - [ ] `GAME_REGISTRY` entry added in `packages/shared/src/lib/constants/game-registry.ts`
@@ -431,6 +480,10 @@ users see no header and can't navigate back.
 
 **Missing GAME_REGISTRY entry** — The leaderboard, profile, and game catalog API read
 from `GAME_REGISTRY`. Without an entry, the game won't appear anywhere except direct URL.
+
+**Unregistered achievements** — If achievement IDs in the game code aren't registered in
+`packages/shared/src/lib/constants/achievements.ts`, the API returns 400 "Unknown achievement"
+on every unlock attempt. Also add the game slug to `AchievementCategory` type or the build fails.
 
 **Wrong script path** — From `games/<slug>/index.html` use `../../js/`. Using `../js/`
 causes a 404 and everything silently breaks.
