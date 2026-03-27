@@ -296,6 +296,11 @@ claude --plugin-dir ./game-design
 
 ## Version History
 
+### v2.13.0
+- Added `astro-pro` skill — Astro framework knowledge for browser game development
+- Updated `add-new-game` skill with Astro-first game creation workflow
+- Astro covers: island architecture, GameLayout, content collections, Firebase deployment, PWA, multiplayer compatibility
+
 ### v2.1.0
 - Added `/game-status` - Health monitoring
 - Added `/game-audit` - Comprehensive quality audits

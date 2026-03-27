@@ -18,9 +18,27 @@ It covers every file that must change, the exact patterns to follow, and the ord
 
 **Always read this entire skill before touching any file.**
 
+> **Astro migration in progress.** New games should be built in `apps/web-astro/` using the
+> Astro framework. The Astro path eliminates ~130 lines of boilerplate per game (SEO, header,
+> shared scripts, fallback polyfill, more-games section) — all handled by `GameLayout.astro`.
+> See the **"Astro Path"** sections below. For the full Astro reference, load the `astro-pro` skill.
+
 ---
 
 ## Project Structure
+
+### Astro App (preferred for new games)
+
+```
+apps/web-astro/src/
+  data/games/{game-id}.json       ← Game metadata (drives SEO + layout) — CREATE THIS
+  pages/games/{game-id}.astro     ← Game page (game-specific code only) — CREATE THIS
+  layouts/GameLayout.astro        ← Shared layout (DO NOT MODIFY)
+  components/                     ← Shared components (DO NOT MODIFY)
+  public/js/                      ← Shared JS modules (copies from apps/web/src/js/)
+```
+
+### Legacy App (existing games)
 
 ```
 apps/web/src/
@@ -70,7 +88,143 @@ Achievements from PRD (5–10 is ideal):
 
 ---
 
-## Phase 2: Create the game file
+## Phase 2 (Astro Path): Create game data + page
+
+> **Use this path for all new games.** Skip to "Phase 2 (Legacy)" only if you must add
+> to the old `apps/web/` app.
+
+### 2A.1 Game Data JSON
+
+**Create:** `apps/web-astro/src/data/games/GAME_SLUG.json`
+
+```json
+{
+  "id": "GAME_SLUG",
+  "name": "GAME_NAME",
+  "icon": "GAME_EMOJI",
+  "title": "GAME_NAME | Weekly Arcade - GAME_DESC_SHORT",
+  "description": "GAME_OG_DESC",
+  "keywords": "GAME_KEYWORDS",
+  "url": "/games/GAME_SLUG/",
+  "themeColor": "GAME_THEME_COLOR",
+  "accentColor": "GAME_THEME_COLOR",
+  "genres": GAME_GENRE,
+  "ratingValue": "4.8",
+  "ratingCount": "500",
+  "category": "arcade",
+  "rendering": "canvas"
+}
+```
+
+### 2A.2 Game Page
+
+**Create:** `apps/web-astro/src/pages/games/GAME_SLUG.astro`
+
+```astro
+---
+import GameLayout from '../../layouts/GameLayout.astro';
+import gameData from '../../data/games/GAME_SLUG.json';
+---
+
+<GameLayout
+  title={gameData.title}
+  gameName={gameData.name}
+  gameId={gameData.id}
+  icon={gameData.icon}
+  description={gameData.description}
+  keywords={gameData.keywords}
+  url={gameData.url}
+  themeColor={gameData.themeColor}
+  accentColor={gameData.accentColor}
+  genres={gameData.genres}
+  ratingValue={gameData.ratingValue}
+  ratingCount={gameData.ratingCount}
+>
+  <!-- Game CSS variables -->
+  <Fragment slot="head">
+    <style>
+      :root {
+        --bg-primary: #0f0f1a;
+        --accent: GAME_THEME_COLOR;
+        /* add game-specific CSS variables */
+      }
+    </style>
+  </Fragment>
+
+  <!-- Game HTML (ONLY game-specific markup — no header, no meta, no boilerplate) -->
+  <div class="game-container">
+    <!-- game UI here -->
+  </div>
+
+  <!-- Game scripts -->
+  <Fragment slot="scripts">
+    <script is:inline>
+    (function() {
+      'use strict';
+
+      // Header + auth (shared module handles everything)
+      window.gameHeader.init({
+        title: 'GAME_NAME',
+        icon: 'GAME_EMOJI',
+        gameId: 'GAME_SLUG',
+        buttons: ['sound', 'leaderboard', 'auth'],
+        onSound: () => toggleSound(),
+        onSignIn: async (user) => {
+          currentUser = user;
+          cloudState = await window.gameCloud.loadState('GAME_SLUG');
+          // sync cloud → local
+        },
+        onSignOut: () => { currentUser = null; }
+      });
+
+      // ... game logic (sound, controls, rendering, game loop) ...
+
+      // Score submission via shared gameCloud
+      async function submitScore() {
+        await window.gameCloud.submitScore('GAME_SLUG', {
+          score, level, timeMs, metadata: { /* game-specific */ }
+        });
+      }
+    })();
+    </script>
+  </Fragment>
+</GameLayout>
+
+<!-- Game-specific styles (NO reset, body, reduced-motion — layout handles those) -->
+<style is:global>
+  .game-container { /* ... */ }
+</style>
+```
+
+### 2A.3 What NOT to include in Astro games
+
+GameLayout handles all of these — do NOT add them:
+- `<meta charset>`, viewport, `<title>` — in BaseLayout
+- Preconnects, SEO meta, OG tags, Twitter cards — in SEOHead.astro
+- JSON-LD structured data — in SEOHead.astro
+- PWA manifest, theme-color — in SEOHead.astro
+- CSS reset (`* { box-sizing... }`), scrollbar hide — in BaseLayout
+- Body styles (font, background, touch-action) — in GameLayout
+- `@media (prefers-reduced-motion)` — in BaseLayout
+- Header `<header id="gameHeader">` — in GameHeader.astro
+- Script tags for api-client, auth, game-cloud, game-header — in GameLayout
+- GameCloud fallback polyfill — in GameCloudFallback.astro
+- "More Games" section — in MoreGames.astro
+
+### 2A.4 Build & verify
+
+```bash
+cd apps/web-astro && npx astro build    # verify clean build
+cd apps/web-astro && npx astro dev --port 4201   # test locally
+```
+
+Then continue to Phase 3 (landing page updates) and Phase 4+ as normal.
+
+---
+
+## Phase 2 (Legacy): Create the game file
+
+> **Only use this path if adding to the old `apps/web/` app.**
 
 **Path:** `apps/web/src/games/<GAME_SLUG>/index.html`
 
