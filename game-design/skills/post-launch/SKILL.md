@@ -257,7 +257,77 @@ If a game goes quiet, consider:
 
 ---
 
-## 9. Save Post-Launch Plan
+## 9. Retention Psychology & Re-engagement
+
+Retention isn't luck — it's designed. These patterns are what separate games players try once from games they return to daily.
+
+### Retention Benchmarks
+
+| Metric | Casual Game (Good) | Casual Game (Great) | Action Required |
+|--------|-------------------|--------------------|----|
+| **D1** (next-day return) | 30% | 45%+ | If <20%: onboarding is broken |
+| **D7** (week return) | 12% | 20%+ | If <8%: core loop isn't sticky |
+| **D30** (month return) | 5% | 10%+ | If <3%: no long-term progression |
+
+### Re-engagement Patterns
+
+| Pattern | How It Works | Implementation |
+|---------|-------------|----------------|
+| **Daily Challenges** | New goal each day creates routine + FOMO | "Today: Score 500 in 3 minutes" — resets at midnight UTC |
+| **Streak Rewards** | Consecutive day bonuses leverage loss aversion | Day 1: 10 coins, Day 3: 50 coins, Day 7: 200 coins + exclusive badge |
+| **Comeback Rewards** | Welcome-back bonus after absence | "You've been away 3 days! Here's 100 bonus coins" — rewards return, doesn't punish absence |
+| **Near-Miss Tease** | End screen shows what you almost achieved | "3 points from high score!" / "1 more win for achievement" |
+| **Social Triggers** | Friend activity creates FOMO | "Alex beat your Snake high score!" push notification |
+| **Seasonal Events** | Time-limited content creates urgency | "Weekend Tournament: 2x leaderboard points" |
+| **Progressive Unlocks** | Always something new on the horizon | "Next unlock at Day 5: VIP Lounge" — visible but locked |
+
+### Notification Psychology
+
+**When to send** (these drive returns):
+- Friend beats your score → social trigger + competition
+- New daily challenge available → routine reinforcement
+- New game released this week → content freshness
+- Streak at risk ("Play today to keep your 5-day streak!") → loss aversion
+
+**When NOT to send** (these cause uninstalls):
+- "We miss you!" generic re-engagement → feels desperate
+- More than 2 notifications per day → annoyance threshold
+- During sleeping hours → negative association
+- For a game the player never played → irrelevant
+
+### The Retention Stack
+
+Layer these for compounding return triggers:
+
+```
+Layer 1: Core loop fun (intrinsic — they WANT to play)
+   ↓
+Layer 2: Daily challenge (routine — they play EVERY DAY)
+   ↓
+Layer 3: Streak rewards (loss aversion — they CAN'T MISS a day)
+   ↓
+Layer 4: Progression unlock (anticipation — they NEED to see what's next)
+   ↓
+Layer 5: Social leaderboard (competition — they want to BEAT friends)
+```
+
+Each layer catches players who might slip through the one above.
+
+### Ethical Boundaries
+
+| Acceptable | Manipulative |
+|-----------|-------------|
+| Streak rewards (bonus for returning) | Streak punishment (lose progress for missing) |
+| "New challenge today!" notification | "You're falling behind!" guilt notification |
+| Comeback bonus after absence | Decay mechanics (resources rot while away) |
+| Time-limited bonus events | Pay-to-skip time gates |
+| Showing friend activity | Spamming friends on player's behalf |
+
+**Rule**: A player should feel **happy they returned**, not **punished for leaving**.
+
+---
+
+## 10. Save Post-Launch Plan
 
 After completing the full analysis, save the plan as a file inside the game folder
 so subsequent runs can resume from where you left off.

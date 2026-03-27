@@ -234,16 +234,60 @@ One paragraph: what the game is, who it's for, why it's fun, what makes it uniqu
 - Audio feel (chiptune? ambient? hype?)
 - Environmental storytelling (what the space communicates without words)
 
-## 14. Technical Requirements
+## 14. Onboarding & First-Time Experience
+
+The first 30 seconds determine whether a player stays or bounces. Design the onboarding
+as carefully as the core loop.
+
+### The "Aha Moment"
+Every game has an "aha moment" — the instant the player *gets it* and feels the fun.
+Design for that moment to happen within the first 15-30 seconds.
+
+| Game Type | Aha Moment | When |
+|-----------|-----------|------|
+| Arcade (Snake) | "I ate the food and grew!" | 3 seconds |
+| Puzzle (2048) | "Two tiles merged — I see the pattern" | 5 seconds |
+| Tycoon (Tiny Tycoon) | "I tapped a customer and got coins!" | 5 seconds |
+| Card (Solitaire) | "I moved a card to the foundation — progress!" | 10 seconds |
+
+### Onboarding Principles
+
+| Principle | Why | Implementation |
+|-----------|-----|----------------|
+| **Show, don't tell** | Players skip text walls | Highlight first interactive element, let them discover |
+| **Progressive disclosure** | Reveal mechanics one at a time as needed | Level 1: move only. Level 2: introduce power-ups. Level 3: introduce enemies. |
+| **Immediate success** | First action must feel rewarding | First tap = satisfying sound + visual feedback + points |
+| **Safe failure** | Early mistakes should teach, not punish | First "death" shows tip, doesn't count against score |
+| **Tutorial blindness** | Players WILL skip your tutorial modal | Design the game so it's playable WITHOUT reading anything |
+| **Contextual hints** | Show controls when needed, not upfront | Arrow hint appears when player hasn't moved in 3 seconds |
+
+### Onboarding Flow Template
+```
+1. Game loads → visual hook (animated scene, inviting color) — 0-2s
+2. Single clear CTA ("Tap to start" / "Play") — 2-3s
+3. First action guided by visual affordance (pulsing button, arrow) — 3-5s
+4. Immediate reward for first action (sound + animation + score) — 5-8s
+5. Second mechanic introduced organically — 10-20s
+6. First "aha moment" — player understands the loop — 15-30s
+7. First challenge / near-failure — player is invested — 30-60s
+```
+
+### Anti-Patterns
+- **Modal tutorial walls** — "Here are 6 paragraphs explaining the game" → instant bounce
+- **Forced practice rounds** — "Complete this tutorial to unlock the real game" → frustration
+- **Too many controls at once** — Showing all buttons on first screen → cognitive overload
+- **No feedback on first action** — Player taps, nothing visible happens → confusion
+
+## 15. Technical Requirements
 - Platform targets
 - Recommended engine (Unity, Godot, Phaser, etc.)
 - Backend needs (leaderboard API, matchmaking, auth)
 - MVP scope vs full scope
 
-## 15. MVP Feature List
+## 16. MVP Feature List
 Prioritized list: P0 (launch), P1 (week 2), P2 (month 2)
 
-## 16. Success Metrics
+## 17. Success Metrics
 - D1 / D7 / D30 retention targets
 - Session length target
 - Target score variance (good score spread across player skill levels)

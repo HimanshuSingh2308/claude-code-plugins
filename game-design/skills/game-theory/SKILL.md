@@ -3,9 +3,10 @@ name: game-theory
 description: >
   Game theory and player psychology foundations for game design. Covers flow theory,
   cognitive load, player motivation (intrinsic/extrinsic), Bartle's player types,
-  the peak-end rule, loss aversion, decision fatigue, and other psychological
-  frameworks that drive fun, engagement, and retention. Applied when designing
-  core loops, difficulty, reward systems, or analyzing why a game feels good or bad.
+  the peak-end rule, loss aversion, decision fatigue, habit formation (Hook Model),
+  emotional arc design, tension/release patterns, and other psychological frameworks
+  that drive fun, engagement, and retention. Applied when designing core loops,
+  difficulty, reward systems, session pacing, or analyzing why a game feels good or bad.
 ---
 
 # Game Theory & Player Psychology
@@ -312,17 +313,167 @@ If any numerator is 0, fun is 0. If friction is high, fun is low regardless.
 
 ---
 
-## 12. Game Theory Checklist for PRD
+## 12. Habit Formation — The Hook Model (Nir Eyal)
+
+Why do players come back unprompted? Not because they "should" — because a **habit loop** formed. The Hook Model explains the four-phase cycle that makes games (and apps) sticky beyond a single session.
+
+### The Four Phases
 
 ```
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│   1. TRIGGER ──→ 2. ACTION ──→ 3. VARIABLE ──→ 4. INVESTMENT
+│       │                          REWARD          │
+│       │                                          │
+│       └──────────── habit loop ←─────────────────┘
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+### Phase Details
+
+| Phase | What It Is | Game Example |
+|-------|-----------|--------------|
+| **1. Trigger** | Cue that initiates behavior. External (notification, daily reset) or internal (boredom, "I wonder if...") | Push notification: "New daily challenge!" / Internal: player thinks "I bet I can beat my score" |
+| **2. Action** | The simplest behavior in anticipation of reward. Must be frictionless. | Tap "Play", swipe to start, one button press. The lower the effort, the stronger the hook. |
+| **3. Variable Reward** | The payoff — but unpredictable. Three types: **Tribe** (social validation), **Hunt** (seeking resources/scores), **Self** (mastery/completion) | Random loot drops, leaderboard position changes, unlocking a new achievement you didn't expect |
+| **4. Investment** | Player puts something in that improves the next trigger. Stored value that makes leaving costly. | Saving progress, building upgrades, streak count, customization choices, cloud-synced high score |
+
+### Why "Variable" Reward Matters
+
+Fixed rewards lose power fast (hedonic adaptation). Variable rewards don't.
+
+| Reward Type | Example | Engagement |
+|-------------|---------|------------|
+| **Fixed** | +10 coins every serve | Predictable → boring after 20 serves |
+| **Variable ratio** | +5 to +25 coins, occasional 3x combo bonus, surprise tip | Unpredictable → "one more round" pull |
+| **Variable + escalating** | Streak multiplier + random rush hour + VIP customers | Compounding unpredictability → deep engagement |
+
+### Applying the Hook Model in Weekly Arcade
+
+| Phase | Implementation |
+|-------|---------------|
+| **External triggers** | Push notifications for new games, daily challenges, "your friend beat your score" |
+| **Internal triggers** | Design the "one more round" moment — never end on frustration, always hint at what's next |
+| **Frictionless action** | Game loads in <2s, one tap to play, no login required to start |
+| **Variable rewards** | Random bonus events (rush hour), combo multipliers, achievement surprises, varied customer types |
+| **Investment** | Cloud save progress, upgrade trees, streak counters, unlocked achievements, customization |
+
+### The Investment → Trigger Cycle
+
+This is the secret: investment creates the NEXT trigger.
+
+```
+Player invests (upgrades shop) → "I wonder how much I'll earn now" (internal trigger)
+Player builds streak (Day 5) → "Can't break my streak" (loss aversion + trigger)
+Player sees leaderboard → "I'm 50 points from #3" (social trigger)
+```
+
+---
+
+## 13. Emotional Arc Design
+
+Great games aren't a flat line of fun — they're an emotional **rollercoaster** with intentional peaks, valleys, tension, and release. Designing the emotional arc is as important as designing the mechanics.
+
+### The Session Arc
+
+Every game session should follow a dramatic structure:
+
+```
+Excitement
+   ↑
+   │        ╱╲     CLIMAX
+   │       ╱  ╲   (hardest moment,
+   │      ╱    ╲   highest stakes)
+   │     ╱      ╲
+   │    ╱ BUILD  ╲   RESOLUTION
+   │   ╱  (tension  ╲  (reward,
+   │  ╱   rising)    ╲  reflection)
+   │ ╱                ╲
+   │╱ HOOK              ╲_____ REST
+   │ (instant              (cooldown,
+   │  engagement)           "again?")
+   └──────────────────────────────→ Time
+```
+
+### Phase Design
+
+| Phase | Duration | Player Feeling | Design Goal |
+|-------|----------|---------------|-------------|
+| **Hook** (0-5s) | Instant | Curiosity, anticipation | Immediate visual engagement, clear "what do I do" |
+| **Build** (5s-60%) | Gradual | Growing competence, mild tension | Introduce mechanics, increase difficulty, small wins |
+| **Climax** (60-80%) | Peak | Excitement, pressure, focus | Hardest challenge, highest stakes, combo streaks, rush events |
+| **Resolution** (80-90%) | Release | Satisfaction, accomplishment | Score reveal, rewards, "you did great" feedback |
+| **Rest** (90-100%) | Cooldown | Reflection, decision | Show stats, tease next round, "play again?" prompt |
+
+### Tension/Release Patterns
+
+The brain craves **contrast**, not constant stimulation:
+
+| Pattern | How It Works | Example |
+|---------|-------------|---------|
+| **Calm → Storm** | Quiet phase followed by intensity | Tiny Tycoon: normal pace → RUSH HOUR |
+| **Fail → Recover** | Near-death moment followed by clutch save | Snake: almost hit wall → narrow escape + food |
+| **Scarcity → Abundance** | Resources tight, then jackpot | 2048: board nearly full → clear 4 rows at once |
+| **Anticipation → Payoff** | Build-up before big reward | Solitaire: stack building → final foundation completion |
+| **Repetition → Surprise** | Predictable rhythm broken by unexpected event | Fieldstone: normal pieces → legendary piece drops |
+
+### Emotional Beats Per Game Type
+
+| Game Type | Key Emotional Arc |
+|-----------|------------------|
+| **Arcade** (Snake, Stack Tower) | Quick hook → escalating tension → sudden death → "one more try" |
+| **Puzzle** (2048, Wordle) | Curiosity → deduction → uncertainty → eureka/frustration → resolve |
+| **Idle/Tycoon** (Tiny Tycoon) | Setup → optimization → overwhelm → mastery → expansion |
+| **Card** (Solitaire Roguelite) | Deal → planning → risk-taking → lucky break or bust → round reflection |
+| **Word** (Lumble) | Exploration → pattern recognition → flow → time pressure → score reveal |
+
+### The "One More Round" Moment
+
+The most critical design decision: what happens in the **last 5 seconds** of a session.
+
+**Good endings** (create return):
+- Show what you ALMOST achieved ("3 points from high score!")
+- Tease next unlock ("2 more games until Speed Boost Lv3")
+- Leave unfinished business (Zeigarnik effect — "Daily challenge: 2/3 complete")
+- End on a high note (peak-end rule — show best moment, not worst)
+
+**Bad endings** (kill return):
+- Show only failure ("You lost. Play again?")
+- No context for improvement ("Score: 120" — is that good?)
+- Nothing to come back for (no progression, no daily reset, no new content)
+- Punish the player's time ("Your streak was reset to 0")
+
+---
+
+## 14. Game Theory Checklist for PRD
+
+```
+Flow & Challenge
 [ ] Is the core loop intrinsically fun (not just reward-chasing)?
 [ ] Does difficulty stay in the flow channel?
-[ ] Are there things for Achievers, Explorers, Socializers, and Killers?
 [ ] Is cognitive load managed (4±1 active elements)?
 [ ] Are mechanics introduced one at a time (progressive disclosure)?
-[ ] Does the session end on a positive note (peak-end rule)?
+
+Player Types & Motivation
+[ ] Are there things for Achievers, Explorers, Socializers, and Killers?
 [ ] Are rewards layered (micro + small + medium + large)?
 [ ] Is loss aversion used ethically (combo protection, not punishment)?
-[ ] Does the player know what to do without reading instructions?
+
+Habit Formation (Hook Model)
+[ ] Is there a clear trigger to start playing (external + internal)?
+[ ] Is the action frictionless (<2 taps to start)?
+[ ] Are rewards variable, not fixed (surprise > predictability)?
+[ ] Does the player invest something that creates the next trigger?
 [ ] Is there a "one more round" pull at every session boundary?
+
+Emotional Arc
+[ ] Does the session have a hook → build → climax → resolution → rest arc?
+[ ] Are there tension/release moments (calm before storm)?
+[ ] Does the session end on a positive note (peak-end rule)?
+[ ] Is there unfinished business left (Zeigarnik effect)?
+[ ] Does the end screen tease what's next (near-miss, next unlock)?
+
+Clarity
+[ ] Does the player know what to do without reading instructions?
 ```

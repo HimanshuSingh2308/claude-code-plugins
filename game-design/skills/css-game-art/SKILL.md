@@ -519,7 +519,70 @@ All surfaces use `linear-gradient` or `repeating-linear-gradient` layers. Patter
 
 ---
 
-## 7. Art Checklist for PRD
+## 7. Color Psychology for Games
+
+Color isn't decoration — it's communication. Players read color faster than text. A red flash means danger before the brain processes "you took damage."
+
+### Feedback Color Language
+
+These associations are near-universal in games. Break them and players get confused.
+
+| Color | Meaning | Usage | Hex Range |
+|-------|---------|-------|-----------|
+| **Green** | Good, safe, health, success, money | Score pop, health bar, "correct", coins earned | `#4ade80`, `#22c55e`, `#7DB87D` |
+| **Red** | Danger, damage, error, urgency | Health loss, wrong answer, timer warning, enemy | `#ef4444`, `#FF3B3B`, `#E8736A` |
+| **Gold/Yellow** | Reward, premium, achievement, currency | Coins, XP, achievement unlocked, combo streak | `#FFD700`, `#F5C542`, `#fbbf24` |
+| **Blue** | Calm, info, mana, cooldown, water | Tutorial hints, info tooltips, ability cooldown | `#3498db`, `#00D4FF`, `#87CEEB` |
+| **Purple** | Rare, epic, magic, prestige | Rare items, epic loot, VIP status | `#9b59b6`, `#7c3aed`, `#9C27B0` |
+| **White** | Neutral, clean, common | Regular text, common items, empty states | `#ffffff`, `#f0f0f5`, `#eeeeee` |
+| **Gray** | Disabled, unavailable, used | Locked upgrades, cooldown state, past items | `#888888`, `#9E9E9E`, `#666666` |
+| **Orange** | Warning, energy, moderate urgency | "Almost out of time", medium rarity, warmth | `#FF9800`, `#f39c12`, `#FFA500` |
+
+### Emotional Mood Through Palette
+
+The background palette sets the emotional tone before a single mechanic runs.
+
+| Mood | Palette Style | Example Games |
+|------|--------------|---------------|
+| **Cozy/Warm** | Cream, taupe, soft pink, warm brown | Tiny Tycoon, cafe games, farming sims |
+| **Intense/Competitive** | Dark bg, neon accents, high contrast | Voidbreak, shooters, racing |
+| **Cerebral/Calm** | Muted blues, greens, low contrast | Wordle, Solitaire, chess |
+| **Playful/Fun** | Bright primaries, rounded shapes | Memory Match, party games |
+| **Dark/Mysterious** | Deep purple/navy, gold accents | Roguelites, dungeon games |
+| **Natural/Organic** | Greens, browns, sky blue | Fieldstone, farming, eco games |
+
+### Color Contrast for Readability
+
+| Element | Minimum Contrast | Why |
+|---------|-----------------|-----|
+| Body text on background | 4.5:1 (WCAG AA) | Readable in all lighting |
+| Large headings | 3:1 | Acceptable for >18px bold |
+| Interactive elements | 3:1 vs surrounding | Must be distinguishable |
+| Score/timer during gameplay | 7:1 | Must read instantly while focused on game |
+| Disabled state | Reduce opacity to 40-50% | Clearly not interactive |
+
+### Color Progression for Game Tiers
+
+Use color to signal advancement without words:
+
+```
+Tier 1 (Starter):  Muted, desaturated → "Basic, room to grow"
+Tier 2 (Upgraded): Slightly richer    → "Getting better"
+Tier 3 (Premium):  Saturated + glow   → "This is impressive"
+Tier 4 (Max):      Gold accents + shimmer → "You've mastered this"
+```
+
+Example — shop wall evolution:
+```css
+/* Tier 1 */ background: #E8D5C0;
+/* Tier 2 */ background: #F2EADC; /* lighter, cleaner */
+/* Tier 3 */ background: #D4B896; box-shadow: inset 0 0 40px rgba(245,197,66,0.08); /* warm glow */
+/* Tier 4 */ background: #C9A87C; /* rich + gold pattern overlay */
+```
+
+---
+
+## 8. Art Checklist for PRD
 
 ```
 [ ] Color palette chosen (6-8 colors with hex codes and usage)
