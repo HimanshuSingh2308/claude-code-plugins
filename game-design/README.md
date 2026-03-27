@@ -296,6 +296,13 @@ claude --plugin-dir ./game-design
 
 ## Version History
 
+### v2.15.0
+- Player psychology additions across 4 skills (+340 lines):
+  - `game-theory`: Hook Model (habit formation), Emotional Arc Design
+  - `game-design-prd`: Onboarding Psychology (first 30 seconds, aha moment, tutorial blindness)
+  - `post-launch`: Retention Psychology (D1/D7/D30, streaks, comeback rewards, notification timing)
+  - `css-game-art`: Color Psychology (feedback colors, mood palettes, contrast, tier progression)
+
 ### v2.14.0
 - Model optimization: all 13 agents now have explicit `model:` frontmatter (opus for orchestrators/builders, sonnet for reviewers/checkers, haiku for extractors/simple tasks)
 - Converted `add-new-game` from monolithic skill to agent architecture with 6 specialized sub-agents:
