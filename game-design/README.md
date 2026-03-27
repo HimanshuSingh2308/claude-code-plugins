@@ -202,7 +202,7 @@ All commands enforce safety rules:
 ### Design Skills
 - `/game-design:game-design-prd` - Create complete PRDs
 - `/game-design:game-trend-scout` - Research trending games
-- `/game-design:add-new-game` - Integrate games into monorepo
+- `/game-design:add-new-game` - Integrate games into monorepo (spawns `add-game-orchestrator` agent with 6 sub-agents)
 
 ### Knowledge Skills (auto-applied)
 - `/game-design:level-design` - **NEW** Zone layout, camera perspective, NPC pathfinding, spatial progression
@@ -295,6 +295,12 @@ claude --plugin-dir ./game-design
 ---
 
 ## Version History
+
+### v2.14.0
+- Model optimization: all 13 agents now have explicit `model:` frontmatter (opus for orchestrators/builders, sonnet for reviewers/checkers, haiku for extractors/simple tasks)
+- Converted `add-new-game` from monolithic skill to agent architecture with 6 specialized sub-agents:
+  - `add-game-orchestrator` (sonnet), `game-prd-extractor` (haiku), `game-builder` (opus), `game-landing-updater` (sonnet), `game-registry-updater` (sonnet), `game-seo-updater` (haiku), `game-integration-checker` (sonnet)
+- Original `add-new-game` skill retained as reference material for sub-agents
 
 ### v2.13.0
 - Added `astro-pro` skill — Astro framework knowledge for browser game development

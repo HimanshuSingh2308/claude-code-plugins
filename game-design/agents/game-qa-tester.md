@@ -1,6 +1,7 @@
 ---
 name: game-qa-tester
 description: QA testing agent that systematically tests browser games for bugs, edge cases, UX issues, mobile compatibility, and gameplay problems. Provides detailed bug reports with severity levels.
+model: sonnet
 ---
 
 # Game QA Tester Agent

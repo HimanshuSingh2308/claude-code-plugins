@@ -1,6 +1,7 @@
 ---
 name: game-accessibility-auditor
 description: Accessibility auditing agent that uses Chrome DevTools MCP to run Lighthouse audits, check color contrast, verify reduced motion support, test keyboard navigation, validate touch targets, and ensure inclusive game design. Produces a scored accessibility report with actionable fixes.
+model: sonnet
 ---
 
 # Game Accessibility Auditor Agent

@@ -1,6 +1,7 @@
 ---
 name: leaderboard-validator
 description: Security validation agent for game leaderboards. Reviews score submission systems, anti-cheat patterns, API security, and provides recommendations for secure implementations.
+model: sonnet
 ---
 
 # Leaderboard Validator Agent

@@ -68,7 +68,7 @@ For each plugin directory (excluding `.git`, `.claude-plugin`):
 ### Available Commands
 
 **game-design**
-- `/add-new-game` - Add a new game to Weekly Arcade project
+- `/add-new-game` - Add a new game to Weekly Arcade project (spawns `add-game-orchestrator` agent)
 - `/game-trend-scout` - Scout gaming trends and opportunities
 - `/game-design-prd` - Create game design PRD
 
@@ -89,7 +89,7 @@ For each plugin directory (excluding `.git`, `.claude-plugin`):
 ### Available Skills
 
 **game-design**
-- `add-new-game` - Game integration patterns
+- `add-new-game` - Game integration reference (used by add-game sub-agents)
 - `game-design-prd` - PRD creation knowledge
 - `game-trend-scout` - Trend analysis patterns
 

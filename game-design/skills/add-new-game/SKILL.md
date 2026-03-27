@@ -1,22 +1,23 @@
 ---
 name: add-new-game
 description: >
-  Use this skill whenever you need to add a new game to the Weekly Arcade project.
-  Triggers include: "add this game to the project", "integrate this game", "implement
-  this PRD", "add new game this week", "register the game", "update landing page for
-  new game", "add to leaderboard". This skill handles ALL integration steps: creating
-  the game HTML file, updating the landing page (card + hero badge + JSON-LD + SEO),
-  registering in the leaderboard, updating the sitemap, and ensuring score submission,
-  sounds, animations, and achievements use the correct project patterns.
-  Always use this skill before writing any game code.
+  Reference material for adding a new game to Weekly Arcade. This skill provides the
+  detailed patterns, templates, and checklists used by the add-game agent architecture.
+  The actual workflow is now orchestrated by the `add-game-orchestrator` agent, which
+  delegates to specialized sub-agents: game-prd-extractor (haiku), game-builder (opus),
+  game-landing-updater (sonnet), game-registry-updater (sonnet), game-seo-updater (haiku),
+  and game-integration-checker (sonnet).
+  Triggers: "add this game to the project", "integrate this game", "implement this PRD",
+  "add new game this week". When triggered, spawn the `add-game-orchestrator` agent.
 ---
 
 # Add New Game to Weekly Arcade
 
-This skill handles the full integration of a new game into the Weekly Arcade NX monorepo.
-It covers every file that must change, the exact patterns to follow, and the order to do it.
+> **Agent-driven workflow.** This skill is reference material consumed by the add-game
+> sub-agents. To add a game, spawn the **`add-game-orchestrator`** agent with the PRD.
+> It coordinates 6 specialized sub-agents with optimized model assignments.
 
-**Always read this entire skill before touching any file.**
+This document covers every file that must change, the exact patterns to follow, and the order to do it.
 
 > **Astro migration in progress.** New games should be built in `apps/web-astro/` using the
 > Astro framework. The Astro path eliminates ~130 lines of boilerplate per game (SEO, header,

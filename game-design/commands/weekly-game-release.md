@@ -17,7 +17,7 @@ This command orchestrates the entire weekly game release by coordinating:
 |-----------|------|---------|
 | `game-trend-scout` | Skill | Research trends, rank game concepts |
 | `game-design-prd` | Skill | Generate complete PRD (16-section template) |
-| `add-new-game` | Skill | Implement game in monorepo |
+| `add-game-orchestrator` | Agent | Implement game in monorepo (coordinates 6 sub-agents) |
 | `mobile-game-ux` | Knowledge | Mobile UX patterns |
 | `animation-patterns` | Knowledge | Animation best practices |
 | `sound-design` | Knowledge | Audio implementation |
@@ -141,7 +141,7 @@ Validation:
 ### Phase 3: Build
 
 ```yaml
-Skills: add-new-game + knowledge skills
+Agent: add-game-orchestrator (spawns sub-agents + knowledge skills)
 Branch: feature/game-{slug}
 
 Guardrails Applied:

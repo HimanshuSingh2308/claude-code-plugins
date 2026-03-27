@@ -26,7 +26,7 @@ A plugin marketplace for Claude Code with custom plugins for game design, develo
 
 | Plugin | Description | Skills |
 |--------|-------------|--------|
-| [game-design](./game-design/) | Game design toolkit for PRDs, trend scouting, and game integration | `game-design-prd`, `game-trend-scout`, `add-new-game` |
+| [game-design](./game-design/) | Game design toolkit for PRDs, trend scouting, and game integration | `game-design-prd`, `game-trend-scout`, `add-new-game` + 13 agents |
 
 ## Plugin Details
 
@@ -38,7 +38,7 @@ A comprehensive game design toolkit with three powerful skills:
 |-------|---------|---------|
 | Game Design PRD | `/game-design:game-design-prd` | Create complete game design PRDs with engagement systems, scoring, leaderboards |
 | Game Trend Scout | `/game-design:game-trend-scout` | Research trending games and score opportunities |
-| Add New Game | `/game-design:add-new-game` | Integrate new games into Weekly Arcade project |
+| Add New Game | `/game-design:add-new-game` | Integrate new games via `add-game-orchestrator` agent (6 sub-agents) |
 
 **Includes reference files:**
 - `game-genres.md` - Genre-specific design patterns
@@ -70,7 +70,8 @@ claude-code-plugins/
 │   ├── skills/
 │   │   ├── game-design-prd/
 │   │   ├── game-trend-scout/
-│   │   └── add-new-game/
+│   │   └── add-new-game/       # Reference material for sub-agents
+│   ├── agents/                  # 13 agents with model optimization
 │   └── README.md
 └── README.md
 ```

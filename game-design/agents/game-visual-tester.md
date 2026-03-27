@@ -1,6 +1,7 @@
 ---
 name: game-visual-tester
 description: Visual QA testing agent that uses Chrome DevTools MCP to render games in real browsers, take screenshots, test interactions, and verify layouts across desktop and mobile viewports. Complements the code-based game-qa-tester.
+model: sonnet
 ---
 
 # Game Visual Tester Agent

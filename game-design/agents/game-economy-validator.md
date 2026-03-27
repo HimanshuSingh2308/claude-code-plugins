@@ -1,6 +1,7 @@
 ---
 name: game-economy-validator
 description: Economy validation agent that analyzes game upgrade pricing, revenue curves, currency balance, and progression pacing. Reads game constants and formulas from code, simulates player sessions, checks for dead zones, and verifies server-side validation config exists. Produces a balance report with specific tuning recommendations.
+model: sonnet
 ---
 
 # Game Economy Validator Agent
