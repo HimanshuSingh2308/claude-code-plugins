@@ -411,72 +411,28 @@ header component provides one automatically.
 
 ---
 
-## Phase 3: Update `apps/web/src/index.html` — 6 changes
+## Phase 3: Update Landing Pages
 
-### 3.1 Deploy date comment (line 1)
-```html
-<!-- Deploy: 2026-MM-DD -->   ← today's date
-```
+The `game-landing-updater` agent handles **both** landing pages:
 
-### 3.2 Hero badge
-Find `<span class="badge">` inside `<section class="hero">`:
-```html
-<span class="badge">🎉 New Game This Week: PREVIOUS_GAME_NAME</span>
-```
-Replace with:
-```html
-<span class="badge">🎉 New Game This Week: GAME_NAME</span>
-```
+### 3A. Astro Landing Page (`apps/web-astro/src/pages/index.astro`) — 7 changes
 
-### 3.3 Strip NEW from all previous game cards
-Find every `<span class="tag new">NEW</span>` in the `.games-grid` and delete it.
-Use `expected_replacements` set to the count of currently-NEW games.
+1. **Hero featured section** — Update `<div class="hero-featured">` with new game name, description, tags
+2. **Hero CTA button** — Update href and button text to new game
+3. **Hero thumbnail** — Update `<a class="hero-thumb">` link, image src, and alt text
+4. **Game count** — Increment count in hero description and stats banner
+5. **Remove previous NEW badge** — Delete `<span class="thumb-badge">NEW</span>` from previous game cards
+6. **Add new game card** — Add card with `<span class="thumb-badge">NEW</span>` in `.games-grid`
+7. **JSON-LD and SEO meta** — Update structured data and meta tags
 
-### 3.4 Add new game card at end of `.games-grid`
-```html
-      <!-- GAME_NAME — THIS WEEK -->
-      <a href="/games/GAME_SLUG/" class="game-card">
-        <div class="game-thumb">GAME_EMOJI</div>
-        <div class="game-info">
-          <div class="game-title">GAME_NAME</div>
-          <div class="game-desc">GAME_DESC</div>
-          <div class="game-tags">
-            <span class="tag new">NEW</span>
-            <span class="tag">TAG_1</span>
-            <span class="tag">TAG_2</span>
-          </div>
-        </div>
-      </a>
-```
+### 3B. Legacy Landing Page (`apps/web/src/index.html`) — 6 changes
 
-### 3.5 JSON-LD ItemList entry
-Append before the closing `]` of the ItemList. Increment position by 1.
-```json
-      },
-      {
-        "@type": "ListItem",
-        "position": NEXT_NUMBER,
-        "item": {
-          "@type": "VideoGame",
-          "name": "GAME_NAME",
-          "url": "https://weekly-arcade.web.app/games/GAME_SLUG/",
-          "description": "GAME_DESC",
-          "genre": GAME_GENRE_ARRAY,
-          "playMode": "SinglePlayer",
-          "applicationCategory": "Game",
-          "operatingSystem": "Web Browser",
-          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-        }
-      }
-```
-
-### 3.6 Update homepage SEO meta
-```html
-<meta name="description" content="Play free browser games every week. No downloads.
-Wordle, Snake, 2048, GAME_NAME and more. Sign in optional for leaderboards.">
-<meta name="keywords" content="free browser games, GAME_SLUG, GAME_KEYWORDS,
-wordle, snake game, arcade games, puzzle games">
-```
+1. **Deploy date comment** (line 1) — `<!-- Deploy: 2026-MM-DD -->`
+2. **Hero badge** — `<span class="badge">🎉 New Game This Week: GAME_NAME</span>`
+3. **Strip NEW tags** — Remove all `<span class="tag new">NEW</span>` from previous games
+4. **Add new game card** — At end of `.games-grid` with NEW tag
+5. **JSON-LD ItemList entry** — Append with incremented position number
+6. **Update SEO meta** — Include new game in description and keywords
 
 ---
 
@@ -598,7 +554,16 @@ Bump all other game entries from `0.9` → `0.8` if any currently sit at `0.9`.
 - [ ] `showConfetti()` called on win
 - [ ] `addXP()` called in `onGameEnd()`
 
-**Landing Page & SEO:**
+**Landing Page & SEO (Astro — primary):**
+- [ ] Hero featured section updated (game name, description, tags)
+- [ ] Hero CTA button updated (href + text)
+- [ ] Hero thumbnail updated (image src + alt)
+- [ ] Game count incremented in hero desc and stats banner
+- [ ] NEW badge removed from all previous game cards
+- [ ] New game card added with `<span class="thumb-badge">NEW</span>` and `data-genres`
+- [ ] JSON-LD and SEO meta updated
+
+**Landing Page & SEO (Legacy):**
 - [ ] Hero badge updated to GAME_NAME
 - [ ] NEW tag removed from all previous game cards
 - [ ] New game card has `<span class="tag new">NEW</span>` with `data-genres` attribute

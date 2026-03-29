@@ -16,7 +16,8 @@ This command orchestrates the entire weekly game release by coordinating:
 | Component | Type | Purpose |
 |-----------|------|---------|
 | `game-trend-scout` | Skill | Research trends, rank game concepts |
-| `game-design-prd` | Skill | Generate complete PRD (16-section template) |
+| `product-designer` | Agent | Web research + competitive analysis + PRD creation |
+| `game-design-prd` | Skill | PRD template (used by product-designer agent) |
 | `add-game-orchestrator` | Agent | Implement game in monorepo (coordinates 6 sub-agents) |
 | `mobile-game-ux` | Knowledge | Mobile UX patterns |
 | `animation-patterns` | Knowledge | Animation best practices |
@@ -127,14 +128,22 @@ Selection Criteria:
 ### Phase 2: Design
 
 ```yaml
-Skill: game-design-prd
+Agent: product-designer
+Mode: create
 Input: Selected concept from Phase 1
 Output: ~/Documents/weekly-games/{game-slug}-prd.md
 
+Steps:
+  - Web research: competitors, market trends, player expectations
+  - Check existing PRDs in docs/ for overlap
+  - Generate PRD using game-design-prd template
+  - Add Section 18: Research & Competitive Analysis
+
 Validation:
-  - All 14 PRD sections present
+  - All 14 PRD sections present + Section 18 (Research)
   - Core loop diagram included
   - Scoring system defined
+  - Competitive analysis with 3+ competitors
   - Extractable values (GAME_NAME, GAME_SLUG, etc.)
 ```
 

@@ -87,18 +87,25 @@ Each phase has: `status: 'pending' | 'running' | 'completed' | 'failed'`
 
 ### Phase 2: Design
 
-**Objective**: Generate a complete PRD for the selected game concept.
+**Objective**: Research market and generate a complete, data-driven PRD for the selected game concept.
 
 **Execution**:
 ```
 1. Log: "Starting DESIGN phase with concept: {concept}"
-2. Invoke skill: game-design-prd
+2. Spawn agent: product-designer
+   - Mode: create
    - Input: scout.selectedGame.concept
+   - The agent will:
+     a. Search the web for competitors, market trends, and player expectations
+     b. Check existing PRDs in docs/ to avoid overlap with shipped games
+     c. Generate a full PRD using game-design-prd template
+     d. Include Section 18: Research & Competitive Analysis with citations
 3. Validate PRD structure:
-   - All 14 required sections present
+   - All 14 required sections present + Section 18 (Research)
    - Core loop diagram included
    - Scoring system defined
    - Leaderboard schema defined
+   - Competitive analysis with at least 3 competitors
 4. Extract key values from PRD:
    - GAME_NAME, GAME_SLUG, GAME_EMOJI
    - GAME_DESC, GAME_TAGS, GAME_GENRE

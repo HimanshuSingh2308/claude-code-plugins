@@ -326,6 +326,10 @@ Ask these during your first playtest session:
 - `references/engagement-patterns.md` — Deep dive on retention loops, psychological hooks
 - `references/tech-stack-options.md` — Engine/backend recommendations by platform and budget
 
+## Related Agent
+
+- **`product-designer`** — Agent that performs web research (competitors, trends, player psychology) before PRD creation. Use the agent for research-backed PRDs; use this skill directly for quick PRD drafting without web research.
+
 ## Related Skills (auto-applied)
 
 - **`level-design`** — Zone layout, camera perspective, NPC pathfinding, spatial progression, environment evolution. Consult when designing the game world section of the PRD.

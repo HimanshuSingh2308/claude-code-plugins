@@ -296,6 +296,13 @@ claude --plugin-dir ./game-design
 
 ## Version History
 
+### v2.16.0
+- Added `product-designer` agent — web research, competitive analysis, and data-driven PRD creation/updates
+- Added `/game-design` command — create, update, review, or research PRDs via the product-designer agent
+- Updated `weekly-release-orchestrator` Phase 2 to use product-designer agent (research-backed PRDs)
+- Updated `game-landing-updater` agent to handle Astro landing page hero section (7 changes) in addition to legacy (6 changes)
+- Updated `add-new-game` skill with Astro hero section checklist
+
 ### v2.15.0
 - Player psychology additions across 4 skills (+340 lines):
   - `game-theory`: Hook Model (habit formation), Emotional Arc Design
