@@ -54,6 +54,21 @@
       "keywords": ["auto-update", "plugin-management", "sync", "marketplace", "tools"],
       "category": "utilities",
       "tags": ["tools", "updates", "sync", "management"]
+    },
+    {
+      "name": "backend-dev",
+      "source": "./backend-dev",
+      "description": "Backend development toolkit for NestJS, TypeORM, PostgreSQL, Firestore, Redis. API design, auth, testing, migrations, Docker deployment. Extensible to Express, FastAPI, Prisma.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Himanshu Singh"
+      },
+      "homepage": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+      "repository": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+      "license": "MIT",
+      "keywords": ["backend", "nestjs", "typeorm", "postgresql", "firestore", "redis", "api", "testing", "docker"],
+      "category": "development",
+      "tags": ["backend", "api", "nestjs", "database", "security"]
     }
   ]
 }

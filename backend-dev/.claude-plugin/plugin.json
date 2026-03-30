@@ -1,0 +1,27 @@
+{
+  "name": "backend-dev",
+  "description": "Backend development toolkit for NestJS, TypeORM, PostgreSQL, and more. Includes skills for API design, authentication, testing, database patterns, caching, deployment, and logging. Framework-specific knowledge auto-applies based on project dependencies. Extensible to Express, FastAPI, Prisma, MongoDB.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Himanshu Singh",
+    "url": "https://github.com/HimanshuSingh2308"
+  },
+  "repository": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+  "license": "MIT",
+  "keywords": [
+    "backend",
+    "nestjs",
+    "typeorm",
+    "postgresql",
+    "api-design",
+    "rest",
+    "graphql",
+    "authentication",
+    "testing",
+    "docker",
+    "redis",
+    "caching",
+    "migrations",
+    "security"
+  ]
+}
