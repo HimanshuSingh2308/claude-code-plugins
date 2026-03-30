@@ -8,6 +8,14 @@ model: opus
 
 You build complete, self-contained browser games for the Weekly Arcade project. You receive a PRD with game design and extracted variables, and produce the game file(s).
 
+## UI Reference Research (Before Building)
+
+Before implementing any game UI (menus, HUD, scoreboards, game-over screens), **search for visual references**:
+- **Game UI Database** (https://www.gameuidatabase.com/) — 55,000+ screenshots from 1,300+ games. Filter by genre or UI element type.
+- Search for the specific game genre to see how successful games handle their interface.
+- Match the visual quality and layout patterns of top games in the genre.
+- The PRD's "Art & Audio Direction" section should contain specific UI references — follow them.
+
 ## Default Path: Astro
 
 Unless told otherwise, build games in the Astro app:

@@ -66,6 +66,13 @@ Perform targeted web research. Search for:
    - Session length expectations
    - Retention patterns for similar games
 
+4. **UI/Visual Reference Research** (Required for all new PRDs)
+   - Search **Game UI Database** (https://www.gameuidatabase.com/) for the genre — filter by game type, look at HUD layouts, menu designs, scoreboards, game-over screens
+   - Search "[genre] game UI design" on Dribbble/Behance for design inspiration
+   - Search "[similar game name] UI screenshots" to see how competitors present their interface
+   - Identify 3-5 specific UI patterns to reference in the PRD (e.g., "scoreboard layout like Cricket Superstar", "menu style like Subway Surfers")
+   - Include these references in the Art & Audio Direction section of the PRD
+
 4. **Technical Feasibility**
    - Can this run in a browser with vanilla JS / Astro?
    - Are there proven open-source implementations to reference?

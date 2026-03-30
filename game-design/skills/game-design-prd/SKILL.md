@@ -234,6 +234,14 @@ One paragraph: what the game is, who it's for, why it's fun, what makes it uniqu
 - Audio feel (chiptune? ambient? hype?)
 - Environmental storytelling (what the space communicates without words)
 
+### UI Reference Research (Required)
+Before designing the visual style, **always search for UI references** from similar games:
+- **Game UI Database** (https://www.gameuidatabase.com/) — Browse 55,000+ screenshots from 1,300+ games. Filter by genre, element type (HUD, menu, inventory, settings), or game name. Use this to find real-world examples of how successful games handle menus, HUDs, scoreboards, game-over screens, and in-game UI.
+- **Dribbble** (https://dribbble.com/tags/game-ui) — Designer community with game UI concepts
+- **Behance** (https://www.behance.net/search/projects/game%20ui) — Professional game UI projects
+
+**Workflow**: Search Game UI Database for the genre you're designing (e.g., "sports", "arcade", "puzzle"), screenshot 3-5 UI patterns you want to reference, and describe them in the PRD as visual targets. This prevents designing in a vacuum and ensures the game feels polished from day one.
+
 ## 14. Onboarding & First-Time Experience
 
 The first 30 seconds determine whether a player stays or bounces. Design the onboarding
