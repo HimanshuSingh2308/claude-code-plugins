@@ -2,6 +2,10 @@
 name: api-tester
 description: Test generation agent that reads NestJS service and controller code, then generates comprehensive Jest test files covering happy paths, edge cases, error cases, auth flows, and validation. Produces ready-to-run test files.
 model: sonnet
+# Sonnet for test generation — boilerplate-heavy, pattern matching
+# Batch: YES — generate tests for multiple services/controllers in parallel
+#   When 3+ services need tests: spawn parallel sub-agents (one per service)
+#   For CI bulk generation: use Claude Batch API (50% cost, 24h window)
 ---
 
 # API Tester Agent

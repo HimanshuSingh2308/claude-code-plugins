@@ -1,7 +1,9 @@
 ---
 name: migration-planner
 description: Migration planning agent that analyzes entity changes and plans database migrations with forward migration, rollback, data transformation, breaking change detection, and zero-downtime strategies. Ensures safe production deployments.
-model: sonnet
+model: opus
+# Opus for critical decisions — migrations can cause data loss, needs deep reasoning
+# Batch: Not applicable — migrations are sequential, order-dependent
 ---
 
 # Migration Planner Agent

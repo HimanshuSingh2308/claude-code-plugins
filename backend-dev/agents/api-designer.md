@@ -1,7 +1,9 @@
 ---
 name: api-designer
 description: API design agent that takes requirements in natural language or spec format and outputs complete endpoint definitions, DTOs, entities, relations, GraphQL schemas, and NestJS module scaffolds. Considers pagination, filtering, authentication, and error handling.
-model: sonnet
+model: opus
+# Opus for complex design decisions — architecture requires deep reasoning
+# Batch: Not applicable — design is a single-shot creative task
 ---
 
 # API Designer Agent

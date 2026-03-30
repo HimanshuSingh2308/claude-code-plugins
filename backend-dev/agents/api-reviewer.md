@@ -2,6 +2,8 @@
 name: api-reviewer
 description: Code review agent specialized for NestJS backend applications. Reviews code for architecture, security, performance, testing, and error handling. Provides a quality score out of 30 and lists issues by severity.
 model: sonnet
+# Sonnet for pattern matching + fast code review — doesn't need deep reasoning
+# Batch: YES — when reviewing multiple files/modules, spawn parallel sub-agents per file
 ---
 
 # API Code Reviewer Agent
@@ -188,3 +190,69 @@ Rate each category 1-5:
 - **15-19**: Needs work before production deployment
 - **10-14**: Significant issues, major refactoring needed
 - **<10**: Fundamental architectural problems
+
+---
+
+## Batch Review Mode
+
+When reviewing multiple modules or an entire API, use batch processing for efficiency:
+
+### Strategy: Parallel Sub-Agent Dispatch
+
+```yaml
+When reviewing 3+ modules:
+  1. List all modules to review
+  2. Spawn parallel sub-agents (one per module) using Agent tool
+     - Each sub-agent reviews ONE module (controller + service + DTOs + entity)
+     - Each uses model: sonnet (fast, cost-effective for pattern matching)
+  3. Collect results from all sub-agents
+  4. Merge into a unified report with cross-module issues
+
+When reviewing a single module deeply:
+  - Use a single agent (this one) with model: sonnet
+  - Read all files in the module sequentially
+```
+
+### Claude Batch API Integration
+
+For CI/CD pipeline reviews or bulk audits, use the Claude Batch API:
+
+```typescript
+// Submit multiple file reviews as a batch (50% cost reduction)
+import Anthropic from '@anthropic-ai/sdk';
+
+const client = new Anthropic();
+
+// Prepare batch requests — one per module
+const requests = modules.map((module, i) => ({
+  custom_id: `review-${module.name}`,
+  params: {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    messages: [{
+      role: 'user',
+      content: `Review this NestJS module for architecture, security, performance:\n\n${module.code}`
+    }]
+  }
+}));
+
+// Submit batch (processes within 24h, 50% cheaper)
+const batch = await client.batches.create({ requests });
+console.log('Batch ID:', batch.id); // poll for results
+
+// Retrieve results
+const results = await client.batches.results(batch.id);
+results.forEach(r => {
+  console.log(`${r.custom_id}: ${r.result.message.content[0].text}`);
+});
+```
+
+### When to Use Batch vs Real-Time
+
+| Scenario | Mode | Why |
+|----------|------|-----|
+| Interactive code review (PR) | Real-time (Agent tool) | Developer waiting for feedback |
+| CI pipeline audit (all modules) | Batch API | Not time-sensitive, 50% cheaper |
+| Weekly full codebase audit | Batch API | Scheduled, cost-effective |
+| Single file review | Real-time (Agent tool) | Immediate feedback needed |
+| Bulk DTO validation | Batch API | Many files, pattern matching |
