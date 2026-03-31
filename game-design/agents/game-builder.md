@@ -1,6 +1,6 @@
 ---
 name: game-builder
-description: Builds the complete game file (Astro or legacy HTML) from a PRD and extracted variables. Handles game logic, rendering, sound, controls, score submission, cloud state, and achievements. The most complex agent — requires creative code generation.
+description: Builds the complete Astro game file from a PRD and extracted variables. Handles game logic, rendering, sound, controls, score submission, cloud state, and achievements. The most complex agent — requires creative code generation.
 model: opus
 ---
 
@@ -16,9 +16,9 @@ Before implementing any game UI (menus, HUD, scoreboards, game-over screens), **
 - Match the visual quality and layout patterns of top games in the genre.
 - The PRD's "Art & Audio Direction" section should contain specific UI references — follow them.
 
-## Default Path: Astro
+## Build Path: Astro
 
-Unless told otherwise, build games in the Astro app:
+All new games are built in the Astro app:
 
 ### Files to Create
 
@@ -128,16 +128,25 @@ window.gameHeader.init({
 **Score Submission:**
 ```javascript
 await window.gameCloud.submitScore('{GAME_SLUG}', {
-  score, level, timeMs, metadata: { /* game-specific */ }
+  score, level, timeMs, metadata: { /* game-specific — keys MUST be in allowedMetadataKeys */ }
 });
 ```
 
 **Achievements:**
 ```javascript
+// Achievement ID MUST exist in packages/shared/src/lib/constants/achievements.ts
 window.gameCloud.unlockAchievement('{achievement_id}', '{GAME_SLUG}');
 ```
 
 **Sound:** Use Web Audio API oscillator pattern — `playSound(type)` with game-specific cases.
+
+### Backend Contract Rules (CRITICAL)
+
+- **NEVER call `window.apiClient.addCoins()`** — coins are awarded server-side during score submission. The endpoint was removed. Show coin animations locally for UX, but never call the API.
+- **ALL metadata keys must be declared** in `game-config.ts` `allowedMetadataKeys`. Undeclared keys cause the score submission to be REJECTED.
+- **ALL achievement IDs must be registered** in `achievements.ts` before referencing in game code. Unknown IDs return 400.
+- **Every new game needs a game-config.ts entry** with score limits and `allowedMetadataKeys`.
+- See `backend-contract` skill for the full API contract.
 
 ### Quality Standards
 
@@ -146,15 +155,6 @@ window.gameCloud.unlockAchievement('{achievement_id}', '{GAME_SLUG}');
 - 60fps target: use requestAnimationFrame, avoid layout thrashing
 - Reduced motion support: check `prefers-reduced-motion`
 - Sound only on user gesture (not on page load)
-- Game-over sequence: submit score, check achievements, add XP, show confetti on win
+- Game-over sequence: submit score, check achievements, show confetti on win
 - localStorage for local state persistence
 
-## Legacy Path
-
-Only if explicitly requested. Create `apps/web/src/games/{GAME_SLUG}/index.html` as a self-contained HTML file with inline CSS/JS. Must include the four script tags at bottom of body:
-```html
-<script src="../../js/api-client.js"></script>
-<script src="../../js/auth.js"></script>
-<script src="../../js/game-cloud.js"></script>
-<script src="../../js/game-header.js"></script>
-```
