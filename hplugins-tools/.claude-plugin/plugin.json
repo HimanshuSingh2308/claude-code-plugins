@@ -1,7 +1,7 @@
 {
   "name": "hplugins-tools",
   "description": "Marketplace management tools: auto-update, sync plugins, check status, and manage plugin configurations for hplugins",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Himanshu Singh",
     "url": "https://github.com/HimanshuSingh2308"
@@ -13,6 +13,9 @@
     "plugin-management",
     "sync",
     "marketplace",
-    "tools"
+    "tools",
+    "scaffolding",
+    "ai-model-optimization",
+    "self-learning"
   ]
 }
