@@ -2,9 +2,12 @@
 name: babylonjs-3d
 description: >
   Babylon.js 3D game development patterns for browser games. Covers scene setup,
-  cameras, lighting, meshes, materials/PBR, physics (Havok), animations, particle
-  systems, GUI, asset loading, WebXR, performance optimization, and mobile-friendly
-  3D. Applied when building any 3D browser game or interactive 3D experience.
+  cameras, lighting (clustered, area, volumetric), meshes, materials/PBR/OpenPBR,
+  physics (Havok + character controller), animations (retargeting), particle systems
+  (node editor, flow maps), Gaussian splats, GUI, asset loading, WebXR, navigation
+  meshes, atmosphere rendering, geospatial, performance optimization, and mobile-friendly
+  3D. Includes Babylon 9 features. Applied when building any 3D browser game or
+  interactive 3D experience.
 trigger: >
   When building 3D browser games, when the user mentions Babylon.js, WebGL, 3D game,
   3D rendering, when code imports @babylonjs/*, when files reference BABYLON namespace,
@@ -15,9 +18,10 @@ trigger: >
 
 Babylon.js is a powerful, open-source 3D engine for the web. It renders via WebGL/WebGPU and provides a complete game development toolkit: physics, animation, particles, GUI, audio, and XR support — all in the browser.
 
-**Current Version**: 7.x (WebGPU-ready)
+**Current Version**: 9.x (latest), 7.x/8.x (stable)
 **Docs**: https://doc.babylonjs.com
 **Playground**: https://playground.babylonjs.com
+**Feature Demos**: https://www.babylonjs.com/featureDemos/
 
 ---
 
@@ -1203,6 +1207,447 @@ if (isMobile) {
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 canvas.addEventListener("selectstart", (e) => e.preventDefault());
 ```
+
+---
+
+## Post-Processing Effects
+
+```typescript
+import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
+
+const pipeline = new DefaultRenderingPipeline("default", true, scene, [camera]);
+
+// Bloom (glow on bright objects)
+pipeline.bloomEnabled = true;
+pipeline.bloomThreshold = 0.8;
+pipeline.bloomWeight = 0.5;
+pipeline.bloomKernel = 64;
+
+// Depth of field
+pipeline.depthOfFieldEnabled = true;
+pipeline.depthOfField.focusDistance = 5000;  // in mm
+pipeline.depthOfField.focalLength = 50;
+pipeline.depthOfField.fStop = 2.8;
+
+// Anti-aliasing (FXAA)
+pipeline.fxaaEnabled = true;
+
+// Chromatic aberration
+pipeline.chromaticAberrationEnabled = true;
+pipeline.chromaticAberration.aberrationAmount = 30;
+
+// Tone mapping & exposure
+pipeline.imageProcessingEnabled = true;
+pipeline.imageProcessing.toneMappingEnabled = true;
+pipeline.imageProcessing.toneMappingType = 1; // ACES
+pipeline.imageProcessing.exposure = 1.2;
+pipeline.imageProcessing.contrast = 1.1;
+
+// Vignette
+pipeline.imageProcessing.vignetteEnabled = true;
+pipeline.imageProcessing.vignetteWeight = 2;
+
+// Grain
+pipeline.grainEnabled = true;
+pipeline.grain.intensity = 10;
+pipeline.grain.animated = true;
+```
+
+### SSAO (Ambient Occlusion)
+
+```typescript
+import { SSAO2RenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssao2RenderingPipeline";
+
+const ssao = new SSAO2RenderingPipeline("ssao", scene, {
+  ssaoRatio: 0.5,
+  blurRatio: 1,
+});
+ssao.radius = 2;
+ssao.totalStrength = 1.5;
+ssao.samples = 16;
+scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao", camera);
+```
+
+### Screen Space Reflections
+
+```typescript
+import { SSRRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssrRenderingPipeline";
+
+const ssr = new SSRRenderingPipeline("ssr", scene, [camera], false);
+ssr.strength = 1;
+ssr.reflectionSpecularFalloffExponent = 2;
+ssr.maxSteps = 100;
+```
+
+---
+
+## Sprites (2D in 3D World)
+
+For 2D elements like health bars, indicators, trees in the distance, or 2D characters in a 3D world.
+
+```typescript
+import { SpriteManager } from "@babylonjs/core/Sprites/spriteManager";
+import { Sprite } from "@babylonjs/core/Sprites/sprite";
+
+// Sprite manager — handles a sprite sheet
+const spriteManager = new SpriteManager(
+  "trees",
+  "textures/tree_sprites.png",
+  100,                  // max sprite count
+  { width: 64, height: 128 }, // cell size
+  scene
+);
+
+// Create individual sprites
+const tree = new Sprite("tree", spriteManager);
+tree.position = new Vector3(5, 2, 0);
+tree.size = 4;
+tree.cellIndex = 0; // Which frame in the sprite sheet
+
+// Animated sprite
+const explosion = new Sprite("boom", explosionManager);
+explosion.playAnimation(0, 15, false, 50); // start, end, loop, delay(ms)
+```
+
+---
+
+## Thin Instances (Extreme Performance)
+
+Render 100K+ copies of a mesh with a single draw call. Faster than instances for massive counts.
+
+```typescript
+// Thin instances — provide transformation matrices directly
+const matricesData = new Float32Array(16 * count);
+
+for (let i = 0; i < count; i++) {
+  const matrix = Matrix.Translation(
+    Math.random() * 100 - 50,
+    0,
+    Math.random() * 100 - 50
+  );
+  matrix.copyToArray(matricesData, i * 16);
+}
+
+mesh.thinInstanceSetBuffer("matrix", matricesData, 16);
+
+// Update a specific instance
+const newMatrix = Matrix.Translation(10, 0, 10);
+mesh.thinInstanceSetMatrixAt(index, newMatrix);
+```
+
+**Use case**: Grass, stars, rain, crowds, debris — anything with 1000+ identical objects.
+
+---
+
+## Node Material Editor (Shader Graphs)
+
+Create custom shaders visually — no GLSL/WGSL needed.
+
+```typescript
+import { NodeMaterial } from "@babylonjs/core/Materials/Node/nodeMaterial";
+
+// Load a node material exported from the editor
+const nodeMat = await NodeMaterial.ParseFromFileAsync("", "materials/custom.json", scene);
+mesh.material = nodeMat;
+
+// Or create programmatically
+const nodeMat = new NodeMaterial("custom", scene);
+// Build graph with code... (typically use the visual editor instead)
+// Editor: https://nme.babylonjs.com
+```
+
+**Tools available**:
+- **NME** (Node Material Editor): https://nme.babylonjs.com — custom shaders
+- **NGE** (Node Geometry Editor): https://nge.babylonjs.com — procedural geometry
+- **NPE** (Node Particle Editor): visual particle system design (Babylon 9)
+- **NRGE** (Node Render Graph Editor): custom render pipelines (Babylon 9)
+
+---
+
+## Development Tools
+
+| Tool | URL | Purpose |
+|------|-----|---------|
+| Playground | https://playground.babylonjs.com | Live code editor with instant preview |
+| Sandbox | https://sandbox.babylonjs.com | Drag-and-drop 3D model viewer |
+| Inspector | Built-in (`scene.debugLayer.show()`) | Scene tree, material editor, performance |
+| NME | https://nme.babylonjs.com | Visual shader/material editor |
+| NGE | https://nge.babylonjs.com | Procedural geometry editor |
+| Spector.js | Browser extension | WebGL call debugger |
+
+### Inspector (Essential for Development)
+
+```typescript
+// Enable inspector — add in dev only
+import "@babylonjs/inspector";
+
+// Toggle with keyboard shortcut
+window.addEventListener("keydown", (e) => {
+  if (e.key === "F12" || (e.ctrlKey && e.shiftKey && e.key === "I")) {
+    if (scene.debugLayer.isVisible()) {
+      scene.debugLayer.hide();
+    } else {
+      scene.debugLayer.show({ embedMode: true });
+    }
+  }
+});
+```
+
+---
+
+## Babylon 9 Advanced Features
+
+### Clustered Lighting (Many Dynamic Lights)
+
+Babylon 9 uses clustered forward rendering to efficiently handle dozens of dynamic lights without performance collapse.
+
+```typescript
+// Enable clustered lighting (automatic in Babylon 9)
+// No special setup — just add many lights
+for (let i = 0; i < 50; i++) {
+  const light = new PointLight(`light_${i}`, randomPosition(), scene);
+  light.intensity = 0.5;
+  light.range = 8;
+  light.diffuse = randomColor();
+}
+// Engine clusters the view frustum into a 3D grid
+// Each pixel only evaluates lights in its cluster — O(1) per light
+```
+
+**Use case**: Night scenes with many torches, fireflies, neon signs, explosions.
+**Demo**: https://aka.ms/babylon9CLDemo
+
+### Volumetric Lighting (God Rays)
+
+```typescript
+// Volumetric light scattering — light shafts through fog/dust
+import { VolumetricLightScatteringPostProcess } from "@babylonjs/core/PostProcesses/volumetricLightScatteringPostProcess";
+
+const godrays = new VolumetricLightScatteringPostProcess(
+  "godrays", 1.0, camera, sunMesh, 100,
+  Texture.BILINEAR_SAMPLINGMODE, engine
+);
+godrays.exposure = 0.3;
+godrays.decay = 0.96;
+godrays.weight = 0.5;
+godrays.density = 0.8;
+```
+
+**Use case**: Cathedrals, warehouses, forests with sunbeams.
+**Demo**: https://aka.ms/babylon9vlDemo
+
+### Gaussian Splats (Photorealistic 3D Captures)
+
+Gaussian splatting renders photorealistic 3D scenes captured from real-world photos/video — no traditional mesh or texture needed.
+
+```typescript
+import { GaussianSplattingMesh } from "@babylonjs/core/Meshes/GaussianSplatting/gaussianSplattingMesh";
+
+// Load a .ply or .splat file
+const splat = new GaussianSplattingMesh("splat", null, scene);
+await splat.loadFileAsync("models/scene.ply");
+splat.position = new Vector3(0, 0, 0);
+
+// SPZ format (compressed, faster loading — Babylon 8+)
+const spzSplat = new GaussianSplattingMesh("spz", null, scene);
+await spzSplat.loadFileAsync("models/scene.spz");
+```
+
+**Use case**: Real-world environments, product visualization, mixed reality.
+**Formats**: `.ply`, `.splat`, `.spz` (compressed)
+**Demo**: https://aka.ms/babylon9GSDemo
+
+### Animation Retargeting
+
+Share animations between characters with different body proportions.
+
+```typescript
+// Load source animation and target character
+const source = await SceneLoader.ImportMeshAsync("", "/models/", "animated_char.glb", scene);
+const target = await SceneLoader.ImportMeshAsync("", "/models/", "different_char.glb", scene);
+
+// Retarget animations from source skeleton to target skeleton
+const sourceAnim = source.animationGroups[0];
+const retargeted = sourceAnim.clone("retargeted");
+retargeted.retargetTo(target.skeletons[0]);
+retargeted.start(true);
+```
+
+**Use case**: Apply a walk cycle to any humanoid character regardless of proportions.
+**Demo**: https://aka.ms/babylon9ARDemo
+
+### Node Particle Editor (Visual Particle Design)
+
+Babylon 9 introduces a node-based visual editor for particle systems — design complex effects without code.
+
+```typescript
+// Load a node particle system exported from the editor
+import { NodeParticleSystem } from "@babylonjs/core/Particles/Node/nodeParticleSystem";
+
+const nps = await NodeParticleSystem.ParseFromFileAsync("", "particles/fire.json", scene);
+nps.emitter = torchMesh;
+nps.start();
+```
+
+**Use case**: Complex effects (fire, magic, weather) designed visually.
+**Demo**: https://aka.ms/babylon9NPEDemo
+
+### Particle Flow Maps
+
+Direct particles along artistic paths using flow map textures.
+
+```typescript
+// Flow maps guide particle movement using a texture
+// Red channel = X velocity, Green channel = Y velocity
+particleSystem.noiseTexture = new Texture("textures/flow_map.png", scene);
+particleSystem.noiseStrength = new Vector3(2, 2, 2);
+```
+
+**Use case**: Swirling magic effects, wind-driven particles, water flow.
+**Demo**: https://aka.ms/babylon9PartFMDemo
+
+### Atmosphere Rendering
+
+Physically-based atmospheric scattering for realistic skies, sunsets, and time-of-day.
+
+```typescript
+// Atmosphere rendering — Babylon 9
+// Creates realistic sky with Rayleigh + Mie scattering
+// Responds to sun position for dawn/day/dusk/night transitions
+// Use the time-of-day slider pattern from the demo
+```
+
+**Demo**: https://aka.ms/babylon9ATMDemo
+
+### OpenPBR Material
+
+Next-gen material model beyond standard metallic-roughness PBR. Supports subsurface scattering, thin-film iridescence, diffuse transmission, and more.
+
+```typescript
+// OpenPBR provides physically accurate rendering with:
+// - Subsurface scattering (skin, wax, marble)
+// - Diffuse transmission (leaves, thin fabrics)
+// - Thin-film interference (soap bubbles, oil slicks)
+// - Sheen (velvet, fabric)
+// - Clear coat (car paint, lacquered wood)
+```
+
+**Demo**: https://aka.ms/babylon9OPBRDemo
+
+### Navigation Mesh (AI Pathfinding)
+
+```typescript
+import { RecastJSPlugin } from "@babylonjs/core/Navigation/Plugins/recastJSPlugin";
+import Recast from "recast-detour";
+
+// Initialize navigation plugin
+const recast = await Recast();
+const navPlugin = new RecastJSPlugin(recast);
+
+// Build nav mesh from level geometry
+navPlugin.createNavMesh([ground, obstacles], {
+  cs: 0.2,           // cell size
+  ch: 0.2,           // cell height
+  walkableSlopeAngle: 45,
+  walkableHeight: 2,
+  walkableClimb: 0.5,
+  walkableRadius: 0.5,
+});
+
+// Compute path
+const path = navPlugin.computePath(
+  startPosition,  // Vector3
+  endPosition     // Vector3
+);
+// path = array of Vector3 waypoints
+
+// Crowd agent (multiple AI characters)
+const crowd = navPlugin.createCrowd(10, 0.5, scene);
+const agentIndex = crowd.addAgent(startPos, {
+  radius: 0.5,
+  height: 1.8,
+  maxSpeed: 3.0,
+  maxAcceleration: 4.0,
+});
+crowd.agentGoto(agentIndex, targetPosition);
+```
+
+**Use case**: Enemy AI pathfinding, NPC movement, strategy games.
+**Demo**: https://aka.ms/babylon9NMDemo
+
+### Havok Character Controller (Babylon 8+)
+
+Dedicated character controller built on Havok — better than manual physics body for player movement.
+
+```typescript
+// Purpose-built character controller — handles slopes, stairs, grounding
+// See demo for spiral staircase test
+```
+
+**Demo**: https://aka.ms/babylon8havokCCDemo
+
+### Geometric Booleans (CSG)
+
+Combine meshes using boolean operations — union, intersection, subtraction.
+
+```typescript
+import { CSG } from "@babylonjs/core/Meshes/csg";
+
+const boxCSG = CSG.FromMesh(box);
+const sphereCSG = CSG.FromMesh(sphere);
+
+// Subtract sphere from box → creates a hole
+const result = boxCSG.subtract(sphereCSG);
+const holedBox = result.toMesh("holedBox", null, scene);
+
+// Union — merge shapes
+const merged = boxCSG.union(sphereCSG).toMesh("merged", null, scene);
+
+// Intersect — keep only overlap
+const intersection = boxCSG.intersect(sphereCSG).toMesh("intersect", null, scene);
+```
+
+**Demo**: https://aka.ms/babylon8booleanDemo
+
+### Geospatial Camera & 3D Tiles
+
+Render real-world geography with photogrammetry tiles (Google 3D Tiles, Cesium).
+
+```typescript
+// Geospatial camera for globe/map rendering
+// 3D Tiles for streaming massive real-world datasets
+// See demos for Manhattan aerial view and orbital planet view
+```
+
+**Demo (Geospatial)**: https://aka.ms/babylon9GSCDemo
+**Demo (3D Tiles)**: https://aka.ms/babylon93DTDemo
+
+### SDF Text (Resolution-Independent 3D Text)
+
+Signed Distance Field text stays sharp at any distance or angle — no pixelation.
+
+**Demo**: https://aka.ms/babylon9sdfDemo
+
+### Frame Graph (Advanced Render Pipeline)
+
+Customize the rendering pipeline with a node-based frame graph — add custom passes, post-processing chains, and render targets.
+
+**Demo**: https://aka.ms/babylon9FGDemo
+
+---
+
+## Feature Selection Guide
+
+| Game Type | Key Features to Use |
+|-----------|-------------------|
+| FPS / Third-person | Havok physics, character controller, nav mesh, raycasting, animation retargeting |
+| Racing | Havok vehicles, follow camera, particle trails, volumetric dust |
+| Tower Defense / Strategy | Nav mesh pathfinding, ArcRotateCamera, crowd agents, clustered lighting |
+| Horror / Atmospheric | Volumetric lighting, atmosphere, Gaussian splats, spatial audio, shadows |
+| Puzzle / Casual | CSG booleans, standard materials, GUI, simple physics |
+| Open World | 3D tiles, geospatial camera, LOD, large world rendering, atmosphere |
+| Product Viewer | PBR/OpenPBR, environment HDR, ArcRotateCamera, GUI hotspots |
+| VR/AR | WebXR, hand tracking, teleportation, spatial audio |
 
 ---
 
