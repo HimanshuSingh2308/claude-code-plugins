@@ -1133,30 +1133,63 @@ Exception Flow:
   Exception thrown → Exception Filter → Error Response
 ```
 
-## WebSockets (Brief)
+## WebSockets with Socket.IO
+
+> For comprehensive WebSocket patterns (room management, in-memory state, auth middleware, event protocol), see the **websocket-realtime** skill.
+
+### Setup
+
+```bash
+npm install @nestjs/websockets @nestjs/platform-socket.io socket.io
+```
 
 ```typescript
-@WebSocketGateway({ cors: true })
-export class EventsGateway {
+// main.ts
+import { IoAdapter } from '@nestjs/platform-socket.io';
+app.useWebSocketAdapter(new IoAdapter(app));
+```
+
+### Gateway with Auth, Rooms, and Lifecycle
+
+```typescript
+@WebSocketGateway({
+  namespace: '/game',
+  cors: { origin: ALLOWED_ORIGINS, credentials: true },
+  pingInterval: 15000,
+  pingTimeout: 45000,
+})
+export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  @SubscribeMessage('message')
-  handleMessage(client: Socket, payload: any): WsResponse<any> {
-    return { event: 'response', data: payload };
+  afterInit(server: Server) {
+    server.use(createAuthMiddleware(firebaseService)); // JWT on handshake
   }
 
-  // Broadcast to all
-  broadcastToAll(event: string, data: any) {
-    this.server.emit(event, data);
+  handleConnection(client: Socket) {
+    client.join(`room:${client.data.roomId}`);
+    client.to(`room:${client.data.roomId}`).emit('player:joined', { uid: client.data.user.uid });
   }
 
-  // Broadcast to room
-  broadcastToRoom(room: string, event: string, data: any) {
-    this.server.to(room).emit(event, data);
+  handleDisconnect(client: Socket) {
+    client.to(`room:${client.data.roomId}`).emit('player:left', { uid: client.data.user.uid });
+  }
+
+  @SubscribeMessage('game:move')
+  handleMove(@ConnectedSocket() client: Socket, @MessageBody() payload: MovePayload) {
+    // Validate, apply, broadcast to room
+    this.server.to(`room:${client.data.roomId}`).emit('game:state', newState);
   }
 }
 ```
+
+### Key Patterns
+
+- **Auth middleware:** Verify JWT once on handshake, attach user to `socket.data`
+- **Rooms:** Use `client.join()` / `client.leave()` for session-scoped groups
+- **Broadcast to room:** `this.server.to(room).emit()` (includes sender) or `client.to(room).emit()` (excludes sender)
+- **Typed sockets:** Extend `Socket` interface with `data: { user, sessionId }`
+- **Reconnection:** Socket.IO handles auto-reconnect; re-send current state on reconnect
 
 ## Microservices (Brief)
 
