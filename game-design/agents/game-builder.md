@@ -16,14 +16,35 @@ Before implementing any game UI (menus, HUD, scoreboards, game-over screens), **
 - Match the visual quality and layout patterns of top games in the genre.
 - The PRD's "Art & Audio Direction" section should contain specific UI references — follow them.
 
-## Build Path: Astro
+## Build Path: Astro (Componentized)
 
-All new games are built in the Astro app:
+All new games are built in the Astro app using a **componentized architecture**. Game logic is split into focused modules instead of a single monolithic file.
 
 ### Files to Create
 
 1. **`apps/web-astro/src/data/games/{GAME_SLUG}.json`** — Game metadata
-2. **`apps/web-astro/src/pages/games/{GAME_SLUG}.astro`** — Game page
+2. **`apps/web-astro/src/pages/games/{GAME_SLUG}.astro`** — Thin page shell (~40-60 lines)
+3. **`apps/web-astro/public/components/games/{GAME_SLUG}/`** — Game component files:
+   - `GameConfig.js` — Constants, tuning values, level definitions, achievement IDs
+   - `GameEngine.js` — Core game loop, state machine, update logic, score submission
+   - `GameRenderer.js` — All canvas drawing or DOM rendering
+   - `GameInput.js` — Keyboard, touch, pointer, gamepad input
+   - `GameAudio.js` — Web Audio oscillator sounds, volume/mute
+   - `GameUI.js` — HUD, menus, overlays, game-over screen
+   - `styles.css` — Game-specific CSS variables and styles
+
+Not every game needs all files. For simple games (< 200 lines total), a single IIFE is acceptable. For anything larger, split into components. Rule: **if any file exceeds ~300 lines, split further**.
+
+### Component Communication
+
+Components communicate through the engine — never directly between each other:
+```
+GameEngine owns the game state and loop
+  ├── reads Input.keys / Input.touches
+  ├── calls Renderer.draw(state)
+  ├── calls Audio.play('hit')
+  └── calls UI.updateScore(score)
+```
 
 ### Game Data JSON Template
 
@@ -46,7 +67,9 @@ All new games are built in the Astro app:
 }
 ```
 
-### Astro Page Structure
+### Astro Page Structure (Thin Shell)
+
+The `.astro` file is a thin orchestrator (~40-60 lines). All game logic lives in component files.
 
 ```astro
 ---
@@ -69,30 +92,56 @@ import gameData from '../../data/games/{GAME_SLUG}.json';
   ratingCount={gameData.ratingCount}
 >
   <Fragment slot="head">
-    <style>
-      :root { /* game-specific CSS variables */ }
-    </style>
+    <link rel="stylesheet" href={`/components/games/${gameData.id}/styles.css`} />
   </Fragment>
 
-  <!-- Game HTML (ONLY game-specific markup) -->
+  <!-- Game HTML — only structural markup, no inline logic -->
   <div class="game-container">
-    <!-- game UI -->
+    <div id="menu-screen">
+      <h1>{gameData.icon} {gameData.name}</h1>
+      <button id="start-btn">Play</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="hud" style="display:none;"><!-- HUD elements --></div>
+    <div id="game-over-screen" style="display:none;"><!-- game over UI --></div>
   </div>
 
   <Fragment slot="scripts">
-    <script is:inline>
-    (function() {
-      'use strict';
-      // Game code here
-    })();
+    <script type="module">
+      import { CONFIG } from '/components/games/{GAME_SLUG}/GameConfig.js';
+      import { GameEngine } from '/components/games/{GAME_SLUG}/GameEngine.js';
+
+      const canvas = document.getElementById('gameCanvas');
+      const game = new GameEngine(canvas);
+
+      // Header + Auth integration
+      window.gameHeader.init({
+        title: CONFIG.GAME_NAME,
+        icon: CONFIG.GAME_EMOJI,
+        gameId: CONFIG.GAME_ID,
+        buttons: ['sound', 'leaderboard', 'auth'],
+        onSound: () => game.audio.toggle(),
+        onSignIn: async (user) => {
+          const cloudState = await window.gameCloud.loadState(CONFIG.GAME_ID);
+          await window.gameCloud.syncGuestScores(CONFIG.GAME_ID);
+          if (cloudState?.highScore) game.ui.updateHighScore(cloudState.highScore);
+        },
+        onSignOut: () => {},
+      });
+
+      // Wire UI buttons
+      document.getElementById('start-btn')?.addEventListener('click', () => game.start());
+      document.getElementById('restart-btn')?.addEventListener('click', () => game.restart());
     </script>
   </Fragment>
 </GameLayout>
-
-<style is:global>
-  /* Game-specific styles */
-</style>
 ```
+
+**DO NOT** put game logic in the `.astro` file. The page only:
+1. Imports layout + game data
+2. Provides structural HTML (containers, buttons, canvas)
+3. Imports and wires game components
+4. Initializes header integration
 
 ### What GameLayout Handles (DO NOT duplicate)
 
@@ -150,7 +199,13 @@ window.gameCloud.unlockAchievement('{achievement_id}', '{GAME_SLUG}');
 
 ### Quality Standards
 
-- All game logic in a single IIFE — no global pollution
+- **Componentized architecture**: game logic split into GameConfig, GameEngine, GameRenderer, GameInput, GameAudio, GameUI, styles.css
+- **No file over ~300 lines** — split further into sub-modules:
+  - `engine/` — PhysicsSystem, SpawnSystem, ScoreSystem, ParticleSystem, LevelManager, etc.
+  - `entities/` — Player, Enemy, Projectile, Pickup, etc.
+  - See `astro-pro` skill "Engine Sub-Modules" section for genre-specific patterns
+- **ES modules** (`export class`, `import { }`) — no global pollution, no IIFEs in component files
+- **Engine orchestrates** — components don't import each other directly (except Config)
 - Mobile-first: touch controls, 44px touch targets, responsive layout
 - 60fps target: use requestAnimationFrame, avoid layout thrashing
 - Reduced motion support: check `prefers-reduced-motion`

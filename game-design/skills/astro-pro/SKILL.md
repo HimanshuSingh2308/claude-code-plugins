@@ -111,6 +111,500 @@ apps/web-astro/
 
 ---
 
+## Componentized Game Architecture
+
+Games are split into focused component files instead of a single monolithic `.astro` page. This keeps each file small, testable, and easy to navigate.
+
+### File Layout
+
+```
+apps/web-astro/src/
+├── data/games/{game-id}.json              ← Game metadata (drives SEO + layout)
+├── pages/games/{game-id}.astro            ← Thin page shell — imports components
+└── components/games/{game-id}/
+    ├── GameEngine.js                      ← Core game loop, state machine, update/render
+    ├── GameRenderer.js                    ← All drawing/DOM manipulation
+    ├── GameInput.js                       ← Keyboard, touch, pointer input handling
+    ├── GameAudio.js                       ← Web Audio sound effects + music
+    ├── GameUI.js                          ← HUD, menus, overlays, game-over screen
+    ├── GameConfig.js                      ← Constants, tuning, level definitions
+    └── styles.css                         ← Game-specific CSS (imported in .astro)
+```
+
+Not every game needs all files. Small games can combine renderer + engine, or skip audio. The rule: **if a file exceeds ~300 lines, split it**.
+
+### Component Responsibilities
+
+| File | Owns | Exports |
+|------|------|---------|
+| `GameConfig.js` | Constants, levels, tuning values, achievement IDs | `CONFIG` object |
+| `GameEngine.js` | Game state, game loop, collision, scoring, state transitions | `GameEngine` class |
+| `GameRenderer.js` | Canvas drawing OR DOM updates, animations, particles | `GameRenderer` class |
+| `GameInput.js` | Keyboard map, touch handlers, pointer events, gamepad | `GameInput` class |
+| `GameAudio.js` | AudioContext, sound effects, music, volume/mute | `GameAudio` class |
+| `GameUI.js` | HUD updates, menu show/hide, game-over overlay, score display | `GameUI` class |
+| `styles.css` | CSS variables, game container, UI element styles | CSS (imported) |
+
+### How Components Connect
+
+```
+GameConfig ──────────────────────────────────┐
+     │                                        │
+GameEngine (imports Config)                   │
+     │  ├── owns game state + loop            │
+     │  ├── calls Renderer.draw(state)        │
+     │  ├── calls Audio.play('hit')           │
+     │  ├── reads Input.keys / Input.touches  │
+     │  └── calls UI.updateScore(score)       │
+     │                                        │
+GameRenderer (imports Config)                 │
+     │  └── pure drawing — no state logic     │
+     │                                        │
+GameInput                                     │
+     │  └── captures input, exposes state     │
+     │                                        │
+GameAudio                                     │
+     │  └── plays/stops sounds                │
+     │                                        │
+GameUI (imports Config)                       │
+     └── updates DOM overlays, HUD            │
+```
+
+**Rule**: Components communicate through the engine. Renderer doesn't talk to Input. Audio doesn't talk to UI. The engine orchestrates.
+
+### Component Templates
+
+**GameConfig.js**:
+```javascript
+export const CONFIG = {
+  GAME_ID: '{game-id}',
+  GAME_NAME: '{Game Name}',
+  GAME_EMOJI: '{emoji}',
+
+  // Tuning
+  CANVAS_WIDTH: 400,
+  CANVAS_HEIGHT: 600,
+  TARGET_FPS: 60,
+  TIMESTEP: 1000 / 60,
+
+  // Game-specific constants
+  PLAYER_SPEED: 5,
+  GRAVITY: 0.5,
+  MAX_LIVES: 3,
+
+  // Levels / difficulty progression
+  LEVELS: [
+    { speed: 1, spawnRate: 2000 },
+    { speed: 1.5, spawnRate: 1500 },
+    // ...
+  ],
+
+  // Achievement IDs (must match achievements.ts)
+  ACHIEVEMENTS: {
+    FIRST_WIN: '{game-id}_first_win',
+    HIGH_SCORE: '{game-id}_high_score_1000',
+  },
+};
+```
+
+**GameAudio.js**:
+```javascript
+export class GameAudio {
+  constructor() {
+    this.ctx = null;
+    this.enabled = true;
+  }
+
+  init() {
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  resume() {
+    if (this.ctx?.state === 'suspended') this.ctx.resume();
+  }
+
+  play(sound) {
+    if (!this.enabled || !this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    switch (sound) {
+      case 'hit':
+        osc.frequency.value = 220;
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+        break;
+      // ... more sounds
+    }
+  }
+
+  toggle() {
+    this.enabled = !this.enabled;
+    return this.enabled;
+  }
+}
+```
+
+**GameInput.js**:
+```javascript
+export class GameInput {
+  constructor(canvas) {
+    this.keys = {};
+    this.touch = { active: false, x: 0, y: 0, startX: 0, startY: 0 };
+    this.canvas = canvas;
+    this._bindEvents();
+  }
+
+  _bindEvents() {
+    document.addEventListener('keydown', (e) => { this.keys[e.key] = true; });
+    document.addEventListener('keyup', (e) => { this.keys[e.key] = false; });
+
+    this.canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      this.touch = { active: true, x: t.clientX, y: t.clientY, startX: t.clientX, startY: t.clientY };
+    }, { passive: false });
+
+    this.canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      this.touch.x = t.clientX;
+      this.touch.y = t.clientY;
+    }, { passive: false });
+
+    this.canvas.addEventListener('touchend', () => { this.touch.active = false; });
+  }
+
+  getSwipeDirection(threshold = 30) {
+    const dx = this.touch.x - this.touch.startX;
+    const dy = this.touch.y - this.touch.startY;
+    if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return null;
+    return Math.abs(dx) > Math.abs(dy)
+      ? (dx > 0 ? 'right' : 'left')
+      : (dy > 0 ? 'down' : 'up');
+  }
+
+  destroy() {
+    // Remove listeners if needed
+  }
+}
+```
+
+**GameRenderer.js** (canvas example):
+```javascript
+import { CONFIG } from './GameConfig.js';
+
+export class GameRenderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.canvas.width = CONFIG.CANVAS_WIDTH;
+    this.canvas.height = CONFIG.CANVAS_HEIGHT;
+  }
+
+  clear() {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  drawPlayer(player) { /* ... */ }
+  drawEnemies(enemies) { /* ... */ }
+  drawParticles(particles) { /* ... */ }
+
+  draw(state) {
+    this.clear();
+    this.drawPlayer(state.player);
+    this.drawEnemies(state.enemies);
+    this.drawParticles(state.particles);
+  }
+}
+```
+
+**GameEngine.js**:
+```javascript
+import { CONFIG } from './GameConfig.js';
+import { GameRenderer } from './GameRenderer.js';
+import { GameInput } from './GameInput.js';
+import { GameAudio } from './GameAudio.js';
+import { GameUI } from './GameUI.js';
+
+export class GameEngine {
+  constructor(canvas) {
+    this.renderer = new GameRenderer(canvas);
+    this.input = new GameInput(canvas);
+    this.audio = new GameAudio();
+    this.ui = new GameUI();
+
+    this.state = {
+      status: 'menu', // menu | playing | paused | gameOver
+      score: 0,
+      level: 0,
+      player: { x: CONFIG.CANVAS_WIDTH / 2, y: CONFIG.CANVAS_HEIGHT - 50 },
+      enemies: [],
+      particles: [],
+    };
+
+    this.lastTime = 0;
+    this.accumulator = 0;
+    this.animId = null;
+  }
+
+  start() {
+    this.audio.init();
+    this.state.status = 'playing';
+    this.ui.hideMenu();
+    this.lastTime = performance.now();
+    this.loop(this.lastTime);
+  }
+
+  loop(timestamp) {
+    const delta = timestamp - this.lastTime;
+    this.lastTime = timestamp;
+    this.accumulator += delta;
+
+    while (this.accumulator >= CONFIG.TIMESTEP) {
+      this.update(CONFIG.TIMESTEP);
+      this.accumulator -= CONFIG.TIMESTEP;
+    }
+
+    this.renderer.draw(this.state);
+    this.animId = requestAnimationFrame((t) => this.loop(t));
+  }
+
+  update(dt) {
+    if (this.state.status !== 'playing') return;
+    // Update player, enemies, collisions, scoring...
+  }
+
+  async gameOver() {
+    this.state.status = 'gameOver';
+    cancelAnimationFrame(this.animId);
+
+    // Submit score
+    await window.gameCloud?.submitScore(CONFIG.GAME_ID, {
+      score: this.state.score,
+      level: this.state.level,
+    });
+
+    // Check achievements
+    if (this.state.score >= 1000) {
+      window.gameCloud?.unlockAchievement(CONFIG.ACHIEVEMENTS.HIGH_SCORE, CONFIG.GAME_ID);
+    }
+
+    this.ui.showGameOver(this.state.score);
+  }
+
+  restart() {
+    this.state = { /* reset state */ };
+    this.start();
+  }
+
+  destroy() {
+    cancelAnimationFrame(this.animId);
+    this.input.destroy();
+  }
+}
+```
+
+### Page Shell (.astro file) — Thin Orchestrator
+
+The `.astro` page file becomes a thin shell that imports components:
+
+```astro
+---
+import GameLayout from '../../layouts/GameLayout.astro';
+import gameData from '../../data/games/my-game.json';
+---
+
+<GameLayout
+  title={gameData.title}
+  gameName={gameData.name}
+  gameId={gameData.id}
+  icon={gameData.icon}
+  description={gameData.description}
+  keywords={gameData.keywords}
+  url={gameData.url}
+  themeColor={gameData.themeColor}
+  accentColor={gameData.accentColor}
+  genres={gameData.genres}
+  ratingValue={gameData.ratingValue}
+  ratingCount={gameData.ratingCount}
+>
+  <Fragment slot="head">
+    <link rel="stylesheet" href={`/components/games/${gameData.id}/styles.css`} />
+  </Fragment>
+
+  <div class="game-container">
+    <div id="menu-screen"><!-- menu UI --></div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="game-over-screen" style="display:none;"><!-- game over UI --></div>
+  </div>
+
+  <Fragment slot="scripts">
+    <script type="module">
+      import { CONFIG } from '/components/games/my-game/GameConfig.js';
+      import { GameEngine } from '/components/games/my-game/GameEngine.js';
+
+      const canvas = document.getElementById('gameCanvas');
+      const game = new GameEngine(canvas);
+
+      // Header integration
+      window.gameHeader.init({
+        title: CONFIG.GAME_NAME,
+        icon: CONFIG.GAME_EMOJI,
+        gameId: CONFIG.GAME_ID,
+        buttons: ['sound', 'leaderboard', 'auth'],
+        onSound: () => game.audio.toggle(),
+        onSignIn: async (user) => {
+          const cloudState = await window.gameCloud.loadState(CONFIG.GAME_ID);
+          await window.gameCloud.syncGuestScores(CONFIG.GAME_ID);
+          if (cloudState?.highScore) game.ui.updateHighScore(cloudState.highScore);
+        },
+        onSignOut: () => {},
+      });
+
+      // Start
+      document.getElementById('start-btn')?.addEventListener('click', () => game.start());
+      document.getElementById('restart-btn')?.addEventListener('click', () => game.restart());
+    </script>
+  </Fragment>
+</GameLayout>
+```
+
+**Key change**: The `.astro` file is now ~40-60 lines (layout props + wiring) instead of 500-2000+ lines. All game logic lives in the component files.
+
+### Where Component Files Live
+
+Component JS/CSS files go in `public/components/games/{game-id}/` so they're served as static assets:
+
+```
+apps/web-astro/
+  public/
+    components/games/{game-id}/
+      GameConfig.js
+      GameEngine.js
+      GameRenderer.js
+      GameInput.js
+      GameAudio.js
+      GameUI.js
+      styles.css
+```
+
+Using `public/` means files are served as-is (no Astro bundling), which works with `<script type="module">` and dynamic imports. This keeps Astro's build fast and avoids bundling game code with the framework.
+
+**Alternative** — for games that benefit from bundling/tree-shaking (e.g., Babylon.js 3D games), put components in `src/components/games/{game-id}/` and import them in a `<script>` tag (without `is:inline`). Astro will bundle them via Vite.
+
+### Engine Sub-Modules (Large/Complex Games)
+
+For bigger games, `GameEngine.js` itself can be split into feature-specific modules:
+
+```
+public/components/games/{game-id}/
+├── GameConfig.js
+├── GameEngine.js          ← Thin orchestrator that imports sub-modules
+├── engine/
+│   ├── PhysicsSystem.js   ← Collision detection, gravity, movement
+│   ├── SpawnSystem.js     ← Enemy/item spawning, wave management
+│   ├── ScoreSystem.js     ← Scoring, combos, multipliers, achievements
+│   ├── ParticleSystem.js  ← Visual particles, explosions, trails
+│   ├── PowerUpSystem.js   ← Power-up logic, timers, effects
+│   └── LevelManager.js   ← Level progression, transitions, difficulty
+├── entities/
+│   ├── Player.js          ← Player state, abilities, inventory
+│   ├── Enemy.js           ← Enemy types, AI behaviors, patterns
+│   ├── Projectile.js      ← Bullets, lasers, throwables
+│   └── Pickup.js          ← Coins, health, power-ups
+├── GameRenderer.js
+├── GameInput.js
+├── GameAudio.js
+├── GameUI.js
+└── styles.css
+```
+
+**GameEngine.js becomes a thin coordinator:**
+
+```javascript
+import { CONFIG } from './GameConfig.js';
+import { PhysicsSystem } from './engine/PhysicsSystem.js';
+import { SpawnSystem } from './engine/SpawnSystem.js';
+import { ScoreSystem } from './engine/ScoreSystem.js';
+import { ParticleSystem } from './engine/ParticleSystem.js';
+import { LevelManager } from './engine/LevelManager.js';
+import { GameRenderer } from './GameRenderer.js';
+import { GameInput } from './GameInput.js';
+import { GameAudio } from './GameAudio.js';
+import { GameUI } from './GameUI.js';
+
+export class GameEngine {
+  constructor(canvas) {
+    this.renderer = new GameRenderer(canvas);
+    this.input = new GameInput(canvas);
+    this.audio = new GameAudio();
+    this.ui = new GameUI();
+
+    // Sub-systems
+    this.physics = new PhysicsSystem();
+    this.spawner = new SpawnSystem();
+    this.scoring = new ScoreSystem();
+    this.particles = new ParticleSystem();
+    this.levels = new LevelManager();
+
+    this.state = { status: 'menu', entities: [], /* ... */ };
+  }
+
+  update(dt) {
+    this.spawner.update(dt, this.state);
+    this.physics.update(dt, this.state);     // Movement + collisions
+    this.scoring.update(this.state);          // Score changes from collisions
+    this.particles.update(dt, this.state);    // Visual effects
+    this.levels.checkProgression(this.state); // Level-up check
+
+    this.ui.update(this.state);
+    this.renderer.draw(this.state);
+  }
+}
+```
+
+**Common sub-modules by game genre:**
+
+| Genre | Likely Sub-Modules |
+|-------|-------------------|
+| Platformer | PhysicsSystem, LevelManager, entities/Player, entities/Platform |
+| Tower Defense | SpawnSystem, PathSystem, entities/Tower, entities/Enemy, WaveManager |
+| Puzzle | BoardSystem, MatchSystem, ScoreSystem, AnimationQueue |
+| Idle/Tycoon | EconomySystem, UpgradeManager, TickSystem, SaveSystem |
+| Racing | PhysicsSystem, TrackManager, entities/Vehicle, LapSystem |
+| RPG | CombatSystem, InventorySystem, DialogSystem, QuestManager |
+| Card Game | DeckManager, HandSystem, TurnManager, CardEffects |
+
+**Rule**: Extract a sub-module when a system has its own state + its own update logic. If it's just a helper function, keep it in the parent.
+
+### When to Split vs Keep Together
+
+| Game Size | Lines of Game Code | Approach |
+|-----------|-------------------|----------|
+| Tiny (< 200 lines) | Simple clicker, timer | Single `<script is:inline>` IIFE is fine |
+| Small (200-500 lines) | Basic arcade game | Split into Engine + Config + Audio at minimum |
+| Medium (500-1500 lines) | Full arcade/puzzle game | Full component split (all 6-7 files) |
+| Large (1500+ lines) | RPG, strategy, 3D game | Full split + sub-modules (e.g., `entities/`, `levels/`) |
+
+### Migration: Monolith to Components
+
+To refactor an existing monolithic game:
+
+1. Extract constants/config → `GameConfig.js`
+2. Extract sound functions → `GameAudio.js`
+3. Extract input handling → `GameInput.js`
+4. Extract all draw/render calls → `GameRenderer.js`
+5. Extract DOM/UI updates → `GameUI.js`
+6. What remains is the engine → `GameEngine.js`
+7. Update `.astro` page to import and wire components
+8. Move CSS to `styles.css`, import via `<link>`
+
+---
+
 ## Creating a New Game (.astro)
 
 ### Step 1: Game Data JSON
@@ -136,77 +630,24 @@ Create `src/data/games/{game-id}.json`:
 }
 ```
 
-### Step 2: Game Page
+### Step 2: Game Components
 
-Create `src/pages/games/{game-id}.astro`:
+Create `public/components/games/{game-id}/`:
+- `GameConfig.js` — constants and tuning
+- `GameEngine.js` — game loop and state
+- `GameRenderer.js` — drawing/rendering
+- `GameInput.js` — input handling
+- `GameAudio.js` — sound effects
+- `GameUI.js` — HUD and overlays
+- `styles.css` — game-specific styles
 
-```astro
----
-import GameLayout from '../../layouts/GameLayout.astro';
-import gameData from '../../data/games/my-game.json';
----
+See the component templates above for each file's structure.
 
-<GameLayout
-  title={gameData.title}
-  gameName={gameData.name}
-  gameId={gameData.id}
-  icon={gameData.icon}
-  description={gameData.description}
-  keywords={gameData.keywords}
-  url={gameData.url}
-  themeColor={gameData.themeColor}
-  accentColor={gameData.accentColor}
-  genres={gameData.genres}
-  ratingValue={gameData.ratingValue}
-  ratingCount={gameData.ratingCount}
->
-  <!-- Game CSS variables -->
-  <Fragment slot="head">
-    <style>
-      :root {
-        --bg-primary: #0f0f1a;
-        --accent: #e94560;
-        /* game-specific variables */
-      }
-    </style>
-  </Fragment>
+### Step 3: Game Page
 
-  <!-- Game HTML (ONLY game-specific markup) -->
-  <div class="game-container">
-    <canvas id="gameCanvas"></canvas>
-  </div>
+Create `src/pages/games/{game-id}.astro` as a thin shell that imports the components and wires them to the layout (see "Page Shell" template above).
 
-  <!-- Game scripts -->
-  <Fragment slot="scripts">
-    <script is:inline>
-    (function() {
-      'use strict';
-
-      // Game header init (shared module does auth, buttons, etc.)
-      window.gameHeader.init({
-        title: 'My Game',
-        icon: '🎮',
-        gameId: 'my-game',
-        buttons: ['sound', 'leaderboard', 'auth'],
-        onSound: () => toggleSound(),
-        onSignIn: async (user) => { /* load cloud state */ },
-        onSignOut: () => { /* clear user */ }
-      });
-
-      // ... game logic ...
-    })();
-    </script>
-  </Fragment>
-</GameLayout>
-
-<!-- Game-specific styles -->
-<style is:global>
-  .game-container { /* ... */ }
-  /* Only game-specific styles — no reset, body, header, overlay boilerplate */
-</style>
-```
-
-### Step 3: Build & Verify
+### Step 4: Build & Verify
 
 ```bash
 cd apps/web-astro && npx astro build   # builds to dist/apps/web-astro/
