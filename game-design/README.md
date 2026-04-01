@@ -296,6 +296,15 @@ claude --plugin-dir ./game-design
 
 ## Version History
 
+### v2.17.0
+- Foundation skills audit fixes:
+  - Added 7 missing skills to PRD "Related Skills" (sound-design, animation-patterns, css-game-art, mobile-game-ux, game-accessibility, post-launch, babylonjs-3d) — organized by phase
+  - Added checklist + anti-patterns to `babylonjs-3d` (PRD/build checklists, performance budget, 8 anti-patterns from Chess 3D learnings)
+  - Added checklist + anti-patterns to `animation-patterns` (PRD/build checklists, 6 anti-patterns)
+  - Added `economy-design` + `level-design` to game-audit knowledge references
+- Expanded `sound-design` skill (261→520 lines): background music loops, audio ducking/mixing, spatial audio for 3D, design checklist, 10 anti-patterns
+- Added multiplayer skills: `multiplayer-architecture`, `multiplayer-testing`, `websocket-realtime`
+
 ### v2.16.0
 - Added `product-designer` agent — web research, competitive analysis, and data-driven PRD creation/updates
 - Added `/game-design` command — create, update, review, or research PRDs via the product-designer agent
