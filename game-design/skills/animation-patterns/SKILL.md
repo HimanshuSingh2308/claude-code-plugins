@@ -501,3 +501,34 @@ Animate.countUp(scoreElement, 0, 1250, 500);
 - Prefer CSS over JS animations (compositor thread)
 - Always `particle.remove()` after animation completes
 - Batch DOM inserts with `DocumentFragment`
+
+---
+
+## Animation Checklist
+
+### For PRD Phase
+- [ ] List all state transitions that need animation (menu→game, score change, game over)
+- [ ] Define "juice" expectations: minimal (puzzle), moderate (casual), heavy (action)
+- [ ] Specify particle effects needed (score pop, explosion, sparkle)
+- [ ] Note any screen effects (shake, flash, pulse)
+
+### For Build Phase
+- [ ] Use only `transform` + `opacity` for animations (GPU-accelerated)
+- [ ] Add `prefers-reduced-motion` check — skip or simplify animations
+- [ ] Particles self-clean after animation (`setTimeout` → `remove()`)
+- [ ] Score/combo popups use CSS `@keyframes` not JS intervals
+- [ ] Screen shake uses `transform: translate()` not `margin`/`left`
+- [ ] State transitions use CSS `transition` on class toggle
+- [ ] No animation on page load — wait for user interaction
+- [ ] Test at 60fps — animations shouldn't cause frame drops
+
+### Anti-Patterns
+
+| Anti-Pattern | Problem | Fix |
+|---|---|---|
+| Animating `left`/`top`/`width` | Triggers layout recalc, janky at 60fps | Use `transform: translateX/Y` instead |
+| `will-change` on everything | Wastes GPU memory, can hurt performance | Only add right before animating, remove after |
+| Particles without cleanup | DOM fills with orphaned elements | `setTimeout(() => el.remove(), duration)` |
+| JS `setInterval` for animation | Doesn't sync with display refresh | Use `requestAnimationFrame` or CSS `@keyframes` |
+| Ignoring `prefers-reduced-motion` | Accessibility violation, motion sickness | `@media (prefers-reduced-motion: reduce)` → disable |
+| Easing: `linear` everywhere | Feels robotic and cheap | Use `ease-out` for entrances, `ease-in` for exits |

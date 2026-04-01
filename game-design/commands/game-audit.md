@@ -22,6 +22,8 @@ This command runs a comprehensive audit by invoking all quality agents:
 | `game-economy-validator` | Agent | Economy balance, dead zones, upgrade pricing |
 | `leaderboard-validator` | Agent | Security assessment, anti-cheat |
 | `game-balancing` | Knowledge | Evaluate difficulty/scoring findings |
+| `economy-design` | Knowledge | Evaluate economy balance, pricing curves, faucet/sink ratios |
+| `level-design` | Knowledge | Evaluate spatial layout, camera, zone progression |
 | `performance-tuning` | Knowledge | Evaluate performance findings |
 | `mobile-game-ux` | Knowledge | Evaluate mobile UX findings |
 | `game-accessibility` | Knowledge | Context for accessibility findings |
@@ -106,10 +108,10 @@ Options:
 
 ```bash
 # Check game folder exists
-ls apps/web/src/games/{game-slug}/
+ls apps/web-astro/src/pages/games/{game-slug}.astro
 
 # If not found, list available games
-ls apps/web/src/games/
+ls apps/web-astro/src/pages/games/
 ```
 
 ### Step 2: Read Game Files Once (Shared Context)
@@ -120,9 +122,10 @@ Purpose: Read all game files ONCE upfront and share the parsed context across al
          would cost 6x the read operations.
 
 Files to read:
-  - apps/web/src/games/{game-slug}/**   (all game source files)
-  - apps/web/src/index.html             (integration check)
-  - apps/web/src/leaderboard/index.html (leaderboard integration)
+  - apps/web-astro/src/pages/games/{game-slug}.astro     (game page)
+  - apps/web-astro/src/data/games/{game-slug}.json      (game metadata)
+  - apps/web-astro/src/pages/index.astro                (integration check)
+  - apps/web-astro/src/pages/leaderboard.astro          (leaderboard integration)
 
 Store: game_context = { sourceFiles, htmlContent, fileCount, hasEconomy, hasLeaderboard }
 ```
@@ -138,37 +141,37 @@ Running them sequentially wastes ~80% of the audit time.
 
 Agent 1 - Code Review:
   agent: game-code-reviewer
-  target: apps/web/src/games/{game-slug}/**
+  target: apps/web-astro/src/pages/games/{game-slug}.astro**
   knowledge: game-balancing, performance-tuning
   output: Overall score (/30), issues by category, improvement suggestions
 
 Agent 2 - Visual QA:
   agent: game-visual-tester
-  target: apps/web/src/games/{game-slug}/
+  target: apps/web-astro/src/pages/games/{game-slug}.astro
   knowledge: mobile-game-ux
   output: Viewport pass/fail matrix, Lighthouse scores, console errors
 
 Agent 3 - Functional QA:
   agent: game-qa-tester
-  target: apps/web/src/games/{game-slug}/**
+  target: apps/web-astro/src/pages/games/{game-slug}.astro**
   knowledge: playtesting
   output: Bugs by severity, UX issues, mobile compatibility
 
 Agent 4 - Accessibility Audit:
   agent: game-accessibility-auditor
-  target: apps/web/src/games/{game-slug}/
+  target: apps/web-astro/src/pages/games/{game-slug}.astro
   knowledge: game-accessibility
   output: Accessibility score (/65), WCAG compliance, issues by severity
 
 Agent 5 - Economy Validation (skip if no economy system):
   agent: game-economy-validator
-  target: apps/web/src/games/{game-slug}/
-  knowledge: game-balancing
+  target: apps/web-astro/src/pages/games/{game-slug}.astro
+  knowledge: game-balancing, economy-design
   output: Economy health, dead zone warnings, balance recommendations
 
 Agent 6 - Security Validation:
   agent: leaderboard-validator
-  target: apps/web/src/games/{game-slug}/**
+  target: apps/web-astro/src/pages/games/{game-slug}.astro**
   output: Security assessment, vulnerabilities, anti-cheat evaluation
 ```
 
@@ -413,12 +416,12 @@ When multiple game slugs are provided, run audits in parallel for maximum effici
 ```
 1. Validate all game slugs exist:
    FOR slug IN game_slugs (PARALLEL):
-     ls apps/web/src/games/{slug}/
+     ls apps/web-astro/src/pages/games/{slug}/
    IF any missing: report and continue with valid ones
 
 2. Read all game files upfront (PARALLEL):
    FOR slug IN valid_slugs (PARALLEL):
-     game_contexts[slug] = read(apps/web/src/games/{slug}/**)
+     game_contexts[slug] = read(apps/web-astro/src/pages/games/{slug}.astro, apps/web-astro/src/data/games/{slug}.json)
 
 3. Launch all audits in PARALLEL:
    # For N games × 6 agents = 6N agent calls, but organized as N parallel audit groups

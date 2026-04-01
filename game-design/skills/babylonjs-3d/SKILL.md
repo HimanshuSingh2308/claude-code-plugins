@@ -1662,6 +1662,59 @@ After completing any task using this skill:
 3. **Record user corrections** — any feedback about preferred Babylon.js patterns or versions
 
 ### Adapt Phase
+---
+
+## Checklist
+
+### For PRD Phase
+- [ ] Decide: Babylon.js vs Three.js (Babylon for physics/GUI, Three.js for lightweight scenes)
+- [ ] Define camera type: ArcRotate (orbit), FreeCamera (FPS), FollowCamera (3rd person)
+- [ ] Specify lighting mood: bright/dark, shadow quality needed?
+- [ ] List 3D assets: use basic meshes or load glTF models?
+- [ ] Define mobile target: low-perf devices need reduced shadows, fewer draw calls
+- [ ] Specify interaction: mouse/touch raycasting, drag-and-drop, physics-based?
+
+### For Build Phase
+- [ ] Load Babylon.js from CDN with `is:inline` in Astro (critical!)
+- [ ] Defer `BABYLON.*` constructors to inside `initGame()` (not module level)
+- [ ] Use `ArcRotateCamera` with radius/beta limits for controllable orbit
+- [ ] Add `HemisphericLight` + `DirectionalLight` for balanced lighting
+- [ ] Use `InstancedMesh` for repeated objects (pieces, tiles, trees)
+- [ ] Enable shadows only on capable devices (`detectLowPerf()` guard)
+- [ ] Set `canvas.tabindex = 0` after init (override Babylon's positive tabindex)
+- [ ] Detach camera controls when HTML overlays are open
+- [ ] Test on mobile: touch orbit, pinch zoom, no interference with UI buttons
+- [ ] Dispose scene + engine on `beforeunload` (prevent memory leaks)
+
+### Performance Budget
+- [ ] Draw calls: < 100 (use instancing)
+- [ ] Triangles: < 50K for mobile, < 200K for desktop
+- [ ] Textures: < 10MB total, use compressed where possible
+- [ ] FPS: 60 desktop, 30+ mobile
+- [ ] AI/game logic: < 16ms per frame (don't block render loop)
+- [ ] Initial load: Babylon.js CDN ~800KB, keep game code < 200KB
+
+---
+
+## Anti-Patterns
+
+| Anti-Pattern | Problem | Fix |
+|---|---|---|
+| `BABYLON.Color3` at module level | Crashes if CDN hasn't loaded yet | Defer to `initGame()` or behind `typeof BABYLON` guard |
+| Missing `is:inline` on CDN script | Astro strips external scripts without it | Always add `is:inline` to Babylon CDN tags |
+| Positive `tabindex` on canvas | Breaks DOM focus order for accessibility | Set `canvas.tabindex = 0` after Babylon init |
+| `camera.attachControl` while overlay open | Babylon steals pointer events from HTML buttons | `detachControl()` on overlay show, reattach on hide |
+| Creating meshes every frame | Memory leak, GC pressure | Pre-create mesh pool, reuse with visibility toggle |
+| Shadows on mobile | Kills FPS on low-end devices | Guard with `detectLowPerf()`, disable shadow generator |
+| Full scene rebuild on state change | Expensive, causes flicker | Diff state, only update changed meshes |
+| No `dispose()` on navigation | Memory leak on SPA page transitions | Dispose scene + engine on `beforeunload` |
+
+---
+
+## Self-Learning Protocol
+
+### Recall Phase
+
 Before applying this skill in future tasks:
 1. **Check memory** — search for feedback memories related to Babylon.js / 3D games
 2. **Prioritize recent corrections** — newer feedback overrides older patterns

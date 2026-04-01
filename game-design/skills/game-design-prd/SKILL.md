@@ -340,11 +340,25 @@ Ask these during your first playtest session:
 
 ## Related Skills (auto-applied)
 
-- **`level-design`** — Zone layout, camera perspective, NPC pathfinding, spatial progression, environment evolution. Consult when designing the game world section of the PRD.
+### Design Phase
 - **`game-theory`** — Flow theory, player psychology, cognitive load, motivation frameworks, peak-end rule. Consult when designing difficulty curves, reward systems, and engagement hooks.
-- **`economy-design`** — Currency systems, upgrade pricing formulas, faucets/sinks, revenue projections, inflation control. Consult when designing the upgrade shop and economy section of the PRD.
 - **`game-balancing`** — Difficulty curves, scoring formulas, XP progression, combo systems. Consult when tuning numbers.
+- **`level-design`** — Zone layout, camera perspective, NPC pathfinding, spatial progression, environment evolution. Consult when designing the game world section of the PRD.
+- **`economy-design`** — Currency systems, upgrade pricing formulas, faucets/sinks, revenue projections, inflation control. Consult when designing the upgrade shop and economy section of the PRD.
 - **`playtesting`** — Structured self-testing methodology, feel/pacing evaluation, iteration priorities. Consult when writing the Fun Test Checklist and success metrics.
+
+### Build Phase
+- **`sound-design`** — Web Audio API patterns, procedural SFX, music loops, spatial audio, mobile audio unlock. Consult when specifying audio feedback and mood in the PRD.
+- **`animation-patterns`** — CSS/JS animations, particle effects, screen shake, juice/polish. Consult when specifying visual feedback expectations and transitions.
+- **`css-game-art`** — CSS-only character/environment art, gradients, shadows, pseudo-elements. Consult when the game uses CSS-drawn visuals instead of canvas/WebGL.
+- **`mobile-game-ux`** — Touch targets (44px+), gesture handling, right-hand ergonomics, safe areas, viewport locking. Consult early — mobile UX constraints should inform design, not be bolted on.
+- **`game-accessibility`** — Reduced motion, color contrast, cognitive accessibility, screen reader hints, inclusive design. Consult during design — accessibility is cheaper to design in than to retrofit.
+
+### 3D Games (conditional)
+- **`babylonjs-3d`** — Scene setup, cameras, lighting, PBR materials, physics, particles, WebXR, performance. Consult when designing any 3D browser game using Babylon.js or Three.js.
+
+### Post-Release
+- **`post-launch`** — Analytics setup, session metrics, iteration priorities, A/B testing, cut signals. Consult when defining success metrics and writing the "what to measure after launch" section.
 
 ---
 
