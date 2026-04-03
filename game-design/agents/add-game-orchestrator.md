@@ -20,7 +20,7 @@ Wait for the result — all subsequent phases depend on these variables.
 Spawn the `game-builder` agent with:
 - The extracted variables from Phase 1
 - The full PRD content
-- Instruction to build in `apps/web-astro/` (Astro path) unless explicitly told otherwise
+- Instruction to build in `apps/web-astro/` (Astro path)
 
 Wait for completion — the game file must exist before integration steps.
 
@@ -28,11 +28,15 @@ Wait for completion — the game file must exist before integration steps.
 
 These are independent and can run in parallel:
 
-1. **`game-landing-updater`** — Updates `apps/web/src/index.html` (hero badge, game card, JSON-LD, SEO meta, deploy date, remove previous NEW tags)
+1. **`game-landing-updater`** — Updates ALL public-facing pages:
+   - Homepage (`index.astro`) — hero, game card, JSON-LD, SEO meta, remove previous NEW tags
+   - Games index (`games/index.astro`) — game card, ItemList schema, game count
+   - Category pages (`games/puzzle/`, `games/arcade/`, etc.) — add to `games` array based on GAME_TAGS
+   - **IMPORTANT**: New game must be added at **position 0** (top of every grid/array)
 2. **`game-registry-updater`** — Updates `packages/shared/` (game-registry.ts, achievements.ts, achievement.types.ts)
-3. **`game-seo-updater`** — Updates `apps/web/src/sitemap.xml`
+3. **`game-seo-updater`** — Verifies game page exists for sitemap, verifies /games/ and category pages were updated
 
-Pass extracted variables to each agent.
+Pass extracted variables (including GAME_TAGS for category page matching) to each agent.
 
 ### Phase 4: Verify Integration
 After all Phase 3 agents complete, spawn the `game-integration-checker` agent to verify:
@@ -40,6 +44,7 @@ After all Phase 3 agents complete, spawn the `game-integration-checker` agent to
 - gameId consistency across all files
 - No missing script includes
 - Achievement IDs are registered
+- Homepage, /games/ index, and category pages all include the new game
 - Build passes (`npx nx run shared:build` and `npx nx run web-astro:build`)
 
 ### Error Handling
@@ -56,13 +61,18 @@ After all Phase 3 agents complete, spawn the `game-integration-checker` agent to
 ### Phases Completed
 - [x] PRD extraction — {N} variables extracted
 - [x] Game built — `apps/web-astro/src/pages/games/{GAME_SLUG}.astro`
-- [x] Landing page updated — card, hero badge, JSON-LD, SEO
+- [x] Homepage updated — card (position 0), hero badge, JSON-LD, SEO meta
+- [x] Games index updated — card (position 0), ItemList, game count
+- [x] Category pages updated — {list matching categories, e.g., "arcade, 3d"}
 - [x] Registry updated — GAME_REGISTRY + {N} achievements
-- [x] Sitemap updated
+- [x] SEO verified — sitemap, /games/, category pages
 - [x] Integration verified — all checks passed
 
 ### Files Changed
 {list of all files created or modified}
+
+### Category Page Coverage
+{list which categories were updated and which genres had no page}
 
 ### Next Steps
 - Run `npx nx run web-astro:serve` to test locally

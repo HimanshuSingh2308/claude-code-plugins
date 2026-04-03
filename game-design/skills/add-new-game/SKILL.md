@@ -35,7 +35,12 @@ apps/web-astro/
   src/
     data/games/{game-id}.json       ← Game metadata (drives SEO + layout) — CREATE THIS
     pages/games/{game-id}.astro     ← Thin page shell (~40-60 lines) — CREATE THIS
-    pages/index.astro               ← Landing page (7 changes needed)
+    pages/index.astro               ← Homepage (7 changes needed)
+    pages/games/index.astro         ← Games catalog page (4 changes needed)
+    pages/games/puzzle/index.astro  ← Category page — update if game is puzzle genre
+    pages/games/arcade/index.astro  ← Category page — update if game is arcade genre
+    pages/games/strategy/index.astro ← Category page — update if game is strategy genre
+    pages/games/3d/index.astro      ← Category page — update if game is 3D genre
     pages/leaderboard.astro         ← Leaderboard page (auto-populated from API catalog)
     layouts/GameLayout.astro        ← Shared layout (DO NOT MODIFY)
     components/                     ← Shared components (DO NOT MODIFY)
@@ -224,19 +229,45 @@ Then continue to Phase 3 (landing page updates) and Phase 4+ as normal.
 
 ---
 
-## Phase 3: Update Landing Page
+## Phase 3: Update Landing Pages & SEO
 
-The `game-landing-updater` agent handles the landing page:
+The `game-landing-updater` agent handles ALL public-facing pages:
 
-### Astro Landing Page (`apps/web-astro/src/pages/index.astro`) — 7 changes
+### 3A. Homepage (`apps/web-astro/src/pages/index.astro`) — 7 changes
 
 1. **Hero featured section** — Update `<div class="hero-featured">` with new game name, description, tags
 2. **Hero CTA button** — Update href and button text to new game
 3. **Hero thumbnail** — Update `<a class="hero-thumb">` link, image src, and alt text
-4. **Game count** — Increment count in hero description and stats banner
+4. **Game count** — Increment count in hero description, stats banner, meta description, OG/Twitter description
 5. **Remove previous NEW badge** — Delete `<span class="thumb-badge">NEW</span>` from previous game cards
 6. **Add new game card** — Add card with `<span class="thumb-badge">NEW</span>` in `.games-grid`
 7. **JSON-LD and SEO meta** — Update structured data and meta tags
+
+### 3B. Games Index Page (`apps/web-astro/src/pages/games/index.astro`) — 4 changes
+
+1. **Add new game card** — Add card in `.games-grid` with NEW badge, matching `data-genres`
+2. **Remove previous NEW badges** — Remove from all previous game cards
+3. **Update ItemList JSON-LD** — Add game to `itemListElement` array, update `numberOfItems`
+4. **Update game count** — Section header, meta description, OG description, intro text
+
+### 3C. Category Pages — based on GAME_TAGS
+
+For each genre in the game's tags, update the matching category page if it exists:
+
+| Genre | Category Page |
+|-------|--------------|
+| puzzle | `apps/web-astro/src/pages/games/puzzle/index.astro` |
+| arcade | `apps/web-astro/src/pages/games/arcade/index.astro` |
+| strategy | `apps/web-astro/src/pages/games/strategy/index.astro` |
+| 3d | `apps/web-astro/src/pages/games/3d/index.astro` |
+
+For each matching category page:
+1. **Add game to `games` array** in frontmatter (with `isNew: true`)
+2. **Remove previous `isNew`** flags from other games in the array
+
+The `CategoryPage.astro` component auto-generates the game cards, ItemList schema, and game count from the `games` array — no other changes needed per category page.
+
+If a genre has no category page (e.g., `sports`, `simulation`), skip it and note in output.
 
 ---
 
@@ -316,9 +347,11 @@ automatically included in the sitemap at build time.
 4. Edit `packages/shared/src/lib/constants/game-registry.ts` — add GAME_REGISTRY entry
 5. Edit `packages/shared/src/lib/constants/achievements.ts` — register all achievements
 6. Edit `packages/shared/src/lib/types/achievement.types.ts` — add category to union type
-7. Edit `apps/web-astro/src/pages/index.astro` — all 7 landing page changes
-8. Rebuild shared: `npx nx run shared:build`
-9. Build Astro: `npx nx run web-astro:build`
+7. Edit `apps/web-astro/src/pages/index.astro` — all 7 homepage changes
+8. Edit `apps/web-astro/src/pages/games/index.astro` — add card + ItemList + count
+9. Edit matching category pages (`games/puzzle/`, `games/arcade/`, `games/strategy/`, `games/3d/`) — add to `games` array
+10. Rebuild shared: `npx nx run shared:build`
+11. Build Astro: `npx nx run web-astro:build`
 
 ---
 
@@ -350,14 +383,26 @@ automatically included in the sitemap at build time.
 - [ ] `showConfetti()` called on win
 - [ ] `addXP()` called in `onGameEnd()`
 
-**Landing Page & SEO:**
+**Homepage (`index.astro`):**
 - [ ] Hero featured section updated (game name, description, tags)
 - [ ] Hero CTA button updated (href + text)
 - [ ] Hero thumbnail updated (image src + alt)
-- [ ] Game count incremented in hero desc and stats banner
+- [ ] Game count incremented in hero desc, stats banner, meta description, OG/Twitter description
 - [ ] NEW badge removed from all previous game cards
-- [ ] New game card added with `<span class="thumb-badge">NEW</span>` and `data-genres`
+- [ ] New game card added at **position 0** (top of grid) with `<span class="thumb-badge">NEW</span>` and `data-genres`
 - [ ] JSON-LD and SEO meta updated
+
+**Games Index Page (`/games/index.astro`):**
+- [ ] New game card added at **position 0** (top of grid) with NEW badge
+- [ ] Previous NEW badges removed from other cards
+- [ ] ItemList JSON-LD updated (new entry at position 1, all positions re-numbered)
+- [ ] Game count updated in section header, meta description, OG description, intro text
+
+**Category Pages:**
+- [ ] Game added to `games` array (at **index 0**) in each matching category page frontmatter
+- [ ] Previous `isNew: true` flags removed from other games
+- [ ] All matching category pages updated (puzzle, arcade, strategy, 3d — based on GAME_TAGS)
+- [ ] Missing category pages noted (not created — info only)
 
 **Sitemap:**
 - [ ] Sitemap is auto-generated by @astrojs/sitemap integration — no manual editing needed
@@ -366,6 +411,18 @@ automatically included in the sitemap at build time.
 ---
 
 ## Common Mistakes
+
+**Adding new game at the wrong position** — New games MUST be added at **position 0 (top of the list)** in every game grid and array:
+- Homepage `.games-grid` — new card goes FIRST (before all existing cards)
+- `/games/index.astro` `.games-grid` — new card goes FIRST
+- `/games/index.astro` ItemList JSON-LD — new entry at position 1, re-number all others
+- Category page `games` array — new entry at index 0
+This ensures the newest game is always the most visible. Never append to the end.
+
+**Forgetting to update /games/ index and category pages** — When adding a new game, you must update
+THREE types of pages: (1) homepage, (2) `/games/index.astro`, and (3) matching category pages.
+The game-landing-updater agent handles all three. Missing any of these causes SEO inconsistency
+and broken internal linking.
 
 **Writing custom header HTML/CSS** — Do NOT create a `<header>` with your own back button,
 title styling, or auth button markup. Use `<header id="gameHeader">` with inline fallback +
