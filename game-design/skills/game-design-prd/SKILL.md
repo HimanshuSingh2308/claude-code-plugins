@@ -354,6 +354,9 @@ Ask these during your first playtest session:
 - **`mobile-game-ux`** — Touch targets (44px+), gesture handling, right-hand ergonomics, safe areas, viewport locking. Consult early — mobile UX constraints should inform design, not be bolted on.
 - **`game-accessibility`** — Reduced motion, color contrast, cognitive accessibility, screen reader hints, inclusive design. Consult during design — accessibility is cheaper to design in than to retrofit.
 
+### Complex 2D Games (conditional)
+- **`phaser`** — Phaser 3 scene management, sprites, Arcade/Matter physics, tilemaps, particles, tweens. Consult when building platformers, RPGs, tower defense, or any 2D game needing physics, sprites, or tilemaps beyond vanilla Canvas.
+
 ### 3D Games (conditional)
 - **`babylonjs-3d`** — Scene setup, cameras, lighting, PBR materials, physics, particles, WebXR, performance. Consult when designing any 3D browser game using Babylon.js or Three.js.
 
