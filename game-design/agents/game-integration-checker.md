@@ -32,16 +32,18 @@ Flag any mismatches.
 
 ### 3. Landing Page (Homepage)
 - [ ] Hero badge mentions GAME_NAME
-- [ ] Game card exists with correct href
+- [ ] Game card exists with correct href at position 0 (top of grid)
 - [ ] Only ONE game has the NEW tag
-- [ ] Meta description game count is updated
+- [ ] Game counts are AUTOMATIC (verify `import.meta.glob` pattern exists in frontmatter — do NOT check hardcoded numbers)
 
 ### 4. Games Index Page (`/games/`)
-- [ ] Game card exists in `/games/index.astro` with correct href
-- [ ] ItemList JSON-LD includes the game with correct URL
-- [ ] `numberOfItems` matches actual game count
-- [ ] Game count in section header is updated
+- [ ] Game card exists in `/games/index.astro` with correct href at position 0 (top of grid)
+- [ ] ItemList JSON-LD is AUTOMATIC (verify `itemListSchema` is generated from glob in frontmatter)
+- [ ] Game counts are AUTOMATIC (verify `gameCount` variable used in template expressions)
 - [ ] Only ONE game has the NEW badge
+
+### 4b. About Page (`/about/`)
+- [ ] AUTOMATIC — verify `import.meta.glob` pattern exists in frontmatter (games grid and stats auto-populate)
 
 ### 5. Category Pages
 Based on GAME_TAGS, verify each matching category page:
@@ -96,8 +98,9 @@ Report any build errors. Include API build to catch game-config.ts issues.
 ### Results
 - [x] File existence — OK
 - [x] gameId consistency — OK (found in N/N locations)
-- [x] Homepage — OK (card + hero + meta count)
-- [x] Games index (/games/) — OK (card + ItemList + count)
+- [x] Homepage — OK (card at position 0 + hero + dynamic counts via glob)
+- [x] Games index (/games/) — OK (card at position 0 + dynamic ItemList/counts via glob)
+- [x] About page — OK (dynamic games grid + counts via glob)
 - [x] Category pages — OK (found in N matching categories)
 - [x] Shared package — OK (registry + N achievements + category type)
 - [x] Sitemap — OK (auto-generated)

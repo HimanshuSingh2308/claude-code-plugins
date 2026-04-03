@@ -19,7 +19,7 @@ You receive extracted game variables: GAME_NAME, GAME_SLUG, GAME_EMOJI, GAME_DES
 
 ## Part 1: Homepage (`apps/web-astro/src/pages/index.astro`)
 
-There are **7 changes** to make:
+There are **6 manual changes** to make (game count is automatic):
 
 ### A1. Hero Featured Section
 Find the `<div class="hero-featured">` block and update ALL of:
@@ -52,13 +52,8 @@ Update the thumbnail link, image src, and alt text:
 </a>
 ```
 
-### A4. Game Count
-Update the game count in:
-- Hero description: `<p class="hero-desc">Play {N}+ games instantly...`
-- Stats banner: `<span class="stat-value">{N}</span> Games`
-- Meta description: `Play {N}+ free browser games instantly`
-- OG description: `Play {N}+ free browser games instantly`
-- Twitter description: `Play {N}+ free browser games instantly`
+### A4. Game Count — AUTOMATIC
+**Do NOT manually edit game counts.** The homepage computes `gameCount` dynamically via `import.meta.glob('../data/games/*.json')`. Meta description, OG/Twitter description, hero text, and stats banner all use `{gameCount}` template expressions. As long as the game data JSON file exists (Phase 2), counts auto-update at build time.
 
 ### A5. Remove Previous NEW Badge from Game Cards
 Find ALL `<span class="thumb-badge">NEW</span>` in the `.games-grid` and delete them.
@@ -89,10 +84,10 @@ Update the FAQPage schema answer for "How often are new games added?" if the wor
 
 ## Part 2: Games Index Page (`apps/web-astro/src/pages/games/index.astro`)
 
-There are **4 changes** to make:
+There are **2 manual changes** to make (counts and ItemList are automatic):
 
 ### B1. Add New Game Card
-Add a game card in the `.games-grid` (newest games near the top). Use the same card HTML pattern as the homepage but without `data-genres` filtering (the /games/ page has its own filter system):
+Add a game card at **position 0** (top of `.games-grid`). The /games/ page uses `data-genres` for filtering:
 ```html
       <!-- {GAME_NAME} -->
       <a href="/games/{GAME_SLUG}/" class="game-card" data-genres="{genre1},{genre2}">
@@ -114,18 +109,11 @@ Add a game card in the `.games-grid` (newest games near the top). Use the same c
 ### B2. Remove Previous NEW Badges
 Remove `<span class="thumb-badge">NEW</span>` from all previous game cards in the grid.
 
-### B3. Update ItemList JSON-LD
-Add the new game to the `itemListElement` array and update `numberOfItems`:
-```json
-{ "@type": "ListItem", "position": {N}, "name": "{GAME_NAME}", "url": "https://weeklyarcade.games/games/{GAME_SLUG}/" }
-```
+### B3. ItemList JSON-LD — AUTOMATIC
+**Do NOT manually edit the ItemList schema.** The `/games/` page generates the ItemList dynamically via `import.meta.glob('../../data/games/*.json')`. The `numberOfItems` and all `itemListElement` entries auto-update at build time.
 
-### B4. Update Game Count
-Update the section header game count:
-```html
-<span class="game-count" id="gameCount">{N} games</span>
-```
-Also update the meta description, OG description, and page intro text game count.
+### B4. Game Count — AUTOMATIC
+**Do NOT manually edit game counts.** Meta description, OG/Twitter description, intro text, and section header all use `{gameCount}` computed from the glob. Auto-updates at build time.
 
 ---
 
@@ -157,11 +145,33 @@ Set `isNew: false` (or remove the property) from all other games in the array.
 
 ---
 
+## Part 4: About Page — AUTOMATIC
+
+**Do NOT manually edit the about page.** The about page (`apps/web-astro/src/pages/about/index.astro`) dynamically loads all game data JSON files via `import.meta.glob`. The game count stat and games grid auto-update at build time. No manual changes needed.
+
+---
+
+## Dynamic Count System
+
+These pages compute game counts and lists automatically from `apps/web-astro/src/data/games/*.json` files at build time:
+
+| Page | What's Automatic |
+|------|-----------------|
+| Homepage | Meta/OG/Twitter descriptions, hero text, stats banner count |
+| /games/ | Meta/OG/Twitter descriptions, intro text, section header, ItemList schema |
+| /about/ | Stats banner count, games grid (icons + names + links) |
+| Category pages | Game count and ItemList (driven by `games` array in frontmatter) |
+
+**The only prerequisite is that the game data JSON file exists** (`apps/web-astro/src/data/games/{GAME_SLUG}.json`). This is created in Phase 2.
+
+---
+
 ## Rules
 
 - Read each file first to understand current state
-- Count existing games to determine correct JSON-LD position and game count
+- Do NOT manually edit game counts — they are computed dynamically from game data JSON files
 - Only ONE game should have the NEW badge at a time (across all pages)
+- New games go at **position 0** (top of every grid and array)
 - Preserve all existing game cards — do not remove or reorder them
 - Create the SVG thumbnail if it doesn't exist (or flag it as needed)
 - Report all changes made across all files in your output
