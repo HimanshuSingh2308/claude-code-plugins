@@ -296,7 +296,7 @@ claude --plugin-dir ./game-design
 
 ## Version History
 
-### v2.23.0
+### v2.25.0
 - Added `phaser` skill — Phaser 3 game development patterns for complex 2D browser games
   - Scene management, sprites, Arcade/Matter physics, tilemaps, particles, tweens
   - Weekly Arcade integration patterns (auth, leaderboard, cloud state)
@@ -306,9 +306,9 @@ claude --plugin-dir ./game-design
 - Added `phaser` to PRD "Related Skills" under "Complex 2D Games (conditional)"
 - Recommended stack: Vanilla Canvas (simple) → Phaser (complex 2D) → Babylon.js (3D)
 
-### v2.22.0
-- Multiplayer skills: multiplayer-architecture, multiplayer-testing, websocket-realtime
-- iOS reconnection patterns in multiplayer-testing
+### v2.24.0
+- Document dynamic game count system (import.meta.glob auto-counts)
+- Updated game-landing-updater, game-integration-checker, add-new-game skill
 
 ### v2.17.0
 - Foundation skills audit fixes:
