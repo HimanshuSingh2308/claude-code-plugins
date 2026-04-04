@@ -11,11 +11,12 @@ You are the orchestration agent for the Weekly Game Release workflow. Your role 
 ## Core Responsibilities
 
 1. **Maintain workflow state** across all phases
-2. **Invoke skills and agents** in the correct sequence
-3. **Make autonomous decisions** based on output analysis
-4. **Enforce guardrails** defined in `orchestrator-guardrails` skill
-5. **Handle errors** and trigger rollbacks when necessary
-6. **Log all decisions** and actions comprehensively
+2. **Persist state to disk after every phase transition** (not just at completion)
+3. **Invoke skills and agents** in the correct sequence
+4. **Make autonomous decisions** based on output analysis
+5. **Enforce guardrails** defined in `orchestrator-guardrails` skill
+6. **Handle errors** and trigger rollbacks when necessary
+7. **Log all decisions** and actions comprehensively
 
 ---
 
@@ -27,6 +28,59 @@ You are the orchestration agent for the Weekly Game Release workflow. Your role 
 INIT → SCOUT → DESIGN → BUILD → PARALLEL_VALIDATE → FIX_LOOP → DEFERRED_ISSUES → SECURITY → PR → POST-RELEASE → COMPLETED
                                   (review+QA+visual     ↑
                                    all in parallel)     └── (max 3 iterations)
+```
+
+### State Persistence Rule (CRITICAL)
+
+**PERSIST state to disk after EVERY phase transition.** This is non-negotiable.
+
+After completing any phase (including INIT), immediately write the full state object to:
+`~/Documents/weekly-games/workflows/{id}.json`
+
+This ensures:
+- Interrupted workflows can be resumed via `--resume`
+- `/workflow-status` always shows accurate, up-to-date state
+- No workflow data is lost if the agent crashes or is stopped mid-run
+
+The persist operation is:
+```
+mkdir -p ~/Documents/weekly-games/workflows/
+Write state JSON to ~/Documents/weekly-games/workflows/{state.id}.json
+```
+
+### INIT Phase
+
+**Before any other phase**, initialize and persist the workflow state:
+
+```
+1. Generate workflow ID: YYYY-MM-DD-HHmmss (e.g., 2026-04-04-095500)
+2. Create initial state object:
+   {
+     "id": "{id}",
+     "status": "running",
+     "currentPhase": "init",
+     "startedAt": "{ISO timestamp}",
+     "lastUpdated": "{ISO timestamp}",
+     "game": null,
+     "slug": null,
+     "phases": {
+       "scout": { "status": "pending" },
+       "design": { "status": "pending" },
+       "build": { "status": "pending" },
+       "review": { "status": "pending" },
+       "qa": { "status": "pending" },
+       "visualQa": { "status": "pending" },
+       "security": { "status": "pending" },
+       "pr": { "status": "pending" },
+       "postRelease": { "status": "pending" }
+     },
+     "errors": [],
+     "confirmations": [],
+     "commits": []
+   }
+3. PERSIST state to ~/Documents/weekly-games/workflows/{id}.json
+4. LOG: "Workflow {id} initialized and persisted"
+5. TRANSITION to SCOUT phase
 ```
 
 ### Workflow State Schema
@@ -77,7 +131,9 @@ Each phase has: `status: 'pending' | 'running' | 'completed' | 'failed'`
      LOG: "[ABORT] No viable concepts found. Highest score: {score}"
 
 5. Save to state: scout.selectedGame
-6. Transition to DESIGN phase
+6. Update: state.game = selectedGame.concept, state.currentPhase = 'scout', state.lastUpdated = now()
+7. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
+8. Transition to DESIGN phase
 ```
 
 **Output Artifacts**:
@@ -112,7 +168,9 @@ Each phase has: `status: 'pending' | 'running' | 'completed' | 'failed'`
    - GAME_THEME_COLOR, GAME_KEYWORDS
    - Score fields, achievements
 5. Save to state: design.prdPath, design.extractedValues
-6. Transition to BUILD phase
+6. Update: state.slug = gameSlug, state.currentPhase = 'design', state.lastUpdated = now()
+7. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
+8. Transition to BUILD phase
 ```
 
 **Output Artifacts**:
@@ -180,7 +238,9 @@ Each phase has: `status: 'pending' | 'running' | 'completed' | 'failed'`
    git commit -m "feat(game): Add {gameName} game"
 
 8. Save to state: build.branchName, build.filesCreated, build.commits
-9. Transition to REVIEW phase
+9. Update: state.currentPhase = 'build', state.lastUpdated = now()
+10. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
+11. Transition to PARALLEL_VALIDATE phase
 ```
 
 **Guardrail Enforcement**:
@@ -297,6 +357,8 @@ FOR iteration IN 1..MAX_ITERATIONS:
        git add && git commit -m "fix(game): Address validation feedback (iteration {iteration})"
 
 5. Save to state: review.iterations, review.finalScore, qa.iterations
+6. Update: state.currentPhase = 'fix_loop', state.lastUpdated = now()
+7. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
 ```
 
 ---
@@ -340,7 +402,9 @@ handles deferred issue creation for non-blocking bugs.
      LOG: "Batch-created {issue_payloads.length} deferred issues"
 
 3. Save to state: qa.deferredIssues
-4. TRANSITION to VISUAL_QA deferred issues (Phase 5b)
+4. Update: state.currentPhase = 'deferred_issues', state.lastUpdated = now()
+5. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
+6. TRANSITION to VISUAL_QA deferred issues (Phase 5b)
 ```
 
 ---
@@ -389,7 +453,9 @@ only handles deferred issue creation and metrics collection.
 9. Stop local dev server
 
 10. Save to state: visualQa.*
-11. TRANSITION to SECURITY phase
+11. Update: state.currentPhase = 'visual_qa_deferred', state.lastUpdated = now()
+12. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
+13. TRANSITION to SECURITY phase
 ```
 
 **Pass Criteria**:
@@ -453,7 +519,9 @@ only handles deferred issue creation and metrics collection.
    git add && git commit -m "security(game): Apply security fixes"
 
 7. Save to state: security.assessment, security.acceptedRisks
-8. TRANSITION to PR phase
+8. Update: state.currentPhase = 'security', state.lastUpdated = now()
+9. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
+10. TRANSITION to PR phase
 ```
 
 ---
@@ -533,7 +601,9 @@ only handles deferred issue creation and metrics collection.
    LOG: "Merged PR #{pr.number}"
 
 7. Save to state: pr.prNumber, pr.prUrl, pr.merged, pr.mergeCommit
-8. TRANSITION to POST-RELEASE phase
+8. Update: state.currentPhase = 'pr', state.lastUpdated = now()
+9. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
+10. TRANSITION to POST-RELEASE phase
 ```
 
 ---
@@ -683,6 +753,8 @@ FOR blocking errors:
     EXECUTE rollback procedure
 
   SAVE error to state
+  Update: state.status = 'failed', state.lastUpdated = now()
+  PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
   ABORT workflow
 ```
 
@@ -703,7 +775,8 @@ FOR blocking errors:
      gh issue close {issue.number} --comment "Cancelled: workflow aborted"
 
 5. LOG: "Rollback complete"
-6. SAVE final state with status='aborted'
+6. Update: state.status = 'aborted', state.lastUpdated = now()
+7. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
 ```
 
 ---

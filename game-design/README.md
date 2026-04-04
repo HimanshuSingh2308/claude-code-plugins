@@ -296,6 +296,13 @@ claude --plugin-dir ./game-design
 
 ## Version History
 
+### v2.26.0
+- Fixed workflow state persistence: orchestrator now writes state to disk after **every phase transition**, not just at completion
+  - Added explicit INIT phase that creates `workflows/{id}.json` immediately on start
+  - Added `PERSIST state` step after scout, design, build, fix_loop, deferred_issues, visual_qa, security, and pr phases
+  - Failed/aborted workflows also persist state before exiting
+  - Enables `--resume` and `/workflow-status --running` to work reliably
+
 ### v2.25.0
 - Added `phaser` skill — Phaser 3 game development patterns for complex 2D browser games
   - Scene management, sprites, Arcade/Matter physics, tilemaps, particles, tweens
