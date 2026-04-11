@@ -149,9 +149,35 @@ Validation:
 
 ### Phase 3: Build
 
+**CRITICAL: You MUST use the `add-game-orchestrator` agent for this phase, NOT `game-builder` directly.**
+
+The orchestrator coordinates 6 sub-agents that handle ALL integration points:
+1. `game-prd-extractor` — Extract GAME_* variables
+2. `game-builder` — Build game files (page, JS, CSS, data JSON)
+3. `game-landing-updater` — Update homepage hero, game cards, /games/ index, category pages
+4. `game-registry-updater` — GAME_REGISTRY entry + achievements + AchievementCategory type
+5. `game-seo-updater` — Verify sitemap inclusion and SEO pages
+6. `game-integration-checker` — Final verification gate (all files, all pages, build)
+
+**If you skip the orchestrator and call `game-builder` directly, the following will be MISSING:**
+- Homepage hero and game card (game invisible on landing page)
+- /games/ index card (game invisible in catalog)
+- Category page entries (game invisible in genre pages)
+- Achievement registration (backend rejects unlock calls)
+- AchievementCategory type (TypeScript compilation fails)
+- SVG thumbnail (broken images on cards)
+- Integration verification (bugs ship undetected)
+
 ```yaml
 Agent: add-game-orchestrator (spawns sub-agents + knowledge skills)
 Branch: feature/game-{slug}
+
+MANDATORY Sub-Agents (all must complete):
+  - game-builder: Creates game files
+  - game-landing-updater: Updates ALL landing/category pages
+  - game-registry-updater: Registry + achievements + types
+  - game-seo-updater: Sitemap verification
+  - game-integration-checker: MUST PASS before proceeding to Phase 4
 
 Guardrails Applied:
   BLOCKED:
@@ -160,15 +186,17 @@ Guardrails Applied:
     - Force operations
 
   CONFIRM:
-    - Modify index.html
-    - Modify sitemap.xml
-    - Modify leaderboard/index.html
+    - Modify index.astro (homepage)
+    - Modify games/index.astro
+    - Modify category pages
 
   SAFE:
     - Create files in games/{new-slug}/
     - Read any file
     - Run build/test commands
 ```
+
+**Gate: Phase 3 is NOT complete until `game-integration-checker` reports all checks passing.** If integration checks fail, fix the issues before proceeding to Phase 4.
 
 ### Phase 4: Review Loop
 
@@ -328,6 +356,40 @@ HIGH issues (missing ARIA, small touch targets):
 
 MEDIUM/LOW issues:
   - Create GitHub issues for future improvement
+```
+
+### Phase 9.5: Integration Re-Check (Mandatory Gate)
+
+**This phase exists because Phases 4-9 may have introduced fixes that broke integration, or the initial build may have skipped integration steps.**
+
+```yaml
+Agent: game-integration-checker
+
+MANDATORY — run this even if Phase 3 integration checker passed.
+Phases 4-9 often modify game.js, styles.css, and game-config.ts,
+which can break metadata key alignment, score validation, or
+achievement references.
+
+Checks (all must pass before PR):
+  - All game files exist (page, JS, CSS, data JSON, thumbnail)
+  - Game appears on homepage (hero + card at position 0)
+  - Game appears on /games/ index (card at position 0)
+  - Game appears on matching category pages
+  - Only ONE game has NEW badge across all pages
+  - GAME_REGISTRY entry exists with correct id
+  - All achievements registered in achievements.ts
+  - GAME_SLUG in AchievementCategory type union
+  - game-config.ts metadata keys match game.js submitScore calls
+  - SVG thumbnail exists
+  - Build passes (shared + api + web-astro)
+
+If ANY check fails:
+  - Fix the issue immediately
+  - Re-run the checker
+  - Do NOT proceed to Phase 10 until all checks pass
+
+This phase prevents the exact failure mode where game-builder
+runs but game-landing-updater/game-registry-updater are skipped.
 ```
 
 ### Phase 10: PR & Merge

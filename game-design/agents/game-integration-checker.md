@@ -17,6 +17,11 @@ GAME_SLUG, GAME_NAME, GAME_TAGS (genre tags), and the list of ACHIEVEMENT IDs.
 ### 1. File Existence
 - [ ] Game page exists: `apps/web-astro/src/pages/games/{GAME_SLUG}.astro`
 - [ ] Game data exists (Astro): `apps/web-astro/src/data/games/{GAME_SLUG}.json`
+- [ ] Game JS exists: `apps/web-astro/public/games/{GAME_SLUG}/game.js`
+- [ ] Game CSS exists: `apps/web-astro/public/games/{GAME_SLUG}/styles.css` (if separate)
+- [ ] SVG thumbnail exists: `apps/web-astro/public/images/thumbnails/{GAME_SLUG}.svg`
+- [ ] Score validation config exists: `apps/api/src/leaderboard/config/game-config.ts` (grep for GAME_SLUG)
+- [ ] Service worker updated: `apps/web-astro/public/sw.js` (grep for GAME_SLUG paths)
 
 ### 2. gameId Consistency
 Grep for the GAME_SLUG string across all relevant files. It must match exactly in:
@@ -54,6 +59,19 @@ Based on GAME_TAGS, verify each matching category page:
 | arcade | `apps/web-astro/src/pages/games/arcade/index.astro` |
 | strategy | `apps/web-astro/src/pages/games/strategy/index.astro` |
 | 3d | `apps/web-astro/src/pages/games/3d/index.astro` |
+| action | `apps/web-astro/src/pages/games/action/index.astro` |
+| brain-training / logic | `apps/web-astro/src/pages/games/brain-training/index.astro` |
+| casual / relaxing | `apps/web-astro/src/pages/games/relaxing/index.astro` |
+| quick / daily | `apps/web-astro/src/pages/games/quick/index.astro` |
+| no-ads | `apps/web-astro/src/pages/games/no-ads/index.astro` |
+| card | `apps/web-astro/src/pages/games/card/index.astro` |
+| sports | `apps/web-astro/src/pages/games/sports/index.astro` |
+| simulation | `apps/web-astro/src/pages/games/simulation/index.astro` |
+| multiplayer | `apps/web-astro/src/pages/games/multiplayer/index.astro` |
+| family | `apps/web-astro/src/pages/games/family/index.astro` |
+| offline | `apps/web-astro/src/pages/games/offline/index.astro` |
+
+**Also check `/games/popular/index.astro`** — remove `isNew` from the previous game if present (do NOT add new game unless it's curated by engagement data).
 
 For each matching category page:
 - [ ] Game exists in the `games` array in frontmatter
