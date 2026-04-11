@@ -462,6 +462,28 @@ inner `*/` closes the outer comment and causes a SyntaxError in the shared JS fi
 **Audio on mobile** — Web Audio API requires a user gesture to start. Never call
 `playSound()` on page load. Only call it inside event handlers (click, keydown, touch).
 
+---
+
+## Design Quality Reminders
+
+When building a new game, consult these foundation skills for quality:
+
+| Phase | Skill | Check |
+|-------|-------|-------|
+| Mechanics | `game-theory` | Does the core loop create flow? Is there a "one more round" hook? |
+| Balance | `game-balancing` | Is the difficulty curve smooth? Are scores well-spread? |
+| Economy | `economy-design` | Are upgrade prices fair? Any dead zones? |
+| Layout | `level-design` | Is the spatial design clear? Does progression feel natural? |
+| Audio | `sound-design` | Does every action have audio feedback? Is iOS handled? |
+| Animation | `animation-patterns` | Are transitions smooth? Does it feel "juicy"? |
+| Visuals | `css-game-art` | Are characters/environments visually appealing in pure CSS? |
+| Performance | `performance-tuning` | Is it 60fps? Under memory budget? Fast initial load? |
+| Mobile | `mobile-game-ux` | Touch targets ≥44px? Right-hand ergonomics? No zoom/scroll? |
+| Accessibility | `game-accessibility` | Reduced motion? Color-blind mode? Keyboard navigation? |
+| Testing | `playtesting` | Pass the Fun Test? First 30 seconds clear? |
+
+---
+
 **Calling `apiClient.addCoins()`** — The coin endpoint was removed. Coins are awarded
 server-side automatically during score submission. Games can show local coin animations
 but must NEVER call the API. See `backend-contract` skill.

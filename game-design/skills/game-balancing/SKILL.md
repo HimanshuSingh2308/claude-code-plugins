@@ -403,18 +403,247 @@ const ACHIEVEMENT_TIMELINE = {
 
 ---
 
+## Adaptive Difficulty & Rubber-Banding
+
+Adaptive difficulty adjusts game parameters in real-time based on how the player is performing. The goal is to keep every player in the flow channel — challenged but not frustrated — without them noticing the system exists.
+
+### When to Use Adaptive Difficulty
+
+| Scenario | Use? | Why |
+|----------|------|-----|
+| Story/campaign mode | Yes | Keep all skill levels engaged |
+| Casual/mobile games | Yes | Reduce bounce from frustration |
+| Endless/arcade mode | Sometimes | Gentle assist, but let skill shine |
+| Daily challenges | **No** | Must be identical for all players |
+| Leaderboard-competitive modes | **No** | Undermines fair competition |
+| Speedrun/hardcore modes | **No** | Players expect and want the challenge |
+
+### Simple Adaptive Difficulty System
+
+Track recent performance and adjust a difficulty multiplier up or down.
+
+```javascript
+class AdaptiveDifficulty {
+  constructor(options = {}) {
+    this.multiplier = 1.0;
+    this.min = options.min || 0.5;
+    this.max = options.max || 1.5;
+    this.step = options.step || 0.05;
+    this.history = [];            // Recent outcomes: true = success, false = fail
+    this.windowSize = options.windowSize || 10;
+  }
+
+  recordOutcome(success) {
+    this.history.push(success);
+    if (this.history.length > this.windowSize) {
+      this.history.shift();
+    }
+    this.adjust();
+  }
+
+  adjust() {
+    if (this.history.length < 3) return; // Need minimum data
+
+    const recentWinRate = this.history.filter(Boolean).length / this.history.length;
+
+    if (recentWinRate > 0.8) {
+      // Player is cruising — increase difficulty
+      this.multiplier = Math.min(this.max, this.multiplier + this.step);
+    } else if (recentWinRate < 0.4) {
+      // Player is struggling — decrease difficulty
+      this.multiplier = Math.max(this.min, this.multiplier - this.step);
+    }
+    // Between 0.4–0.8 win rate: player is in the flow zone, hold steady
+  }
+
+  // Apply to any game parameter
+  apply(baseValue) {
+    return baseValue * this.multiplier;
+  }
+
+  reset() {
+    this.multiplier = 1.0;
+    this.history = [];
+  }
+}
+
+// Usage
+const difficulty = new AdaptiveDifficulty({ min: 0.6, max: 1.4 });
+
+function startLevel(levelConfig) {
+  const enemySpeed = difficulty.apply(levelConfig.baseEnemySpeed);
+  const enemyCount = Math.round(difficulty.apply(levelConfig.baseEnemyCount));
+  const timeLimit = levelConfig.baseTimeLimit / difficulty.multiplier; // More time when harder
+  return { enemySpeed, enemyCount, timeLimit };
+}
+
+function onLevelComplete(won) {
+  difficulty.recordOutcome(won);
+}
+```
+
+### Rubber-Banding
+
+Rubber-banding specifically helps struggling players catch up. Unlike general adaptive difficulty, rubber-banding kicks in only when a player is clearly behind.
+
+```javascript
+class RubberBanding {
+  constructor() {
+    this.consecutiveFailures = 0;
+    this.hints = [];
+  }
+
+  onSuccess() {
+    this.consecutiveFailures = 0;
+    this.hints = [];
+  }
+
+  onFailure(context) {
+    this.consecutiveFailures++;
+    return this.getAssist();
+  }
+
+  getAssist() {
+    // Escalating assistance based on failure count
+    if (this.consecutiveFailures >= 5) {
+      return {
+        type: 'skip_offer',
+        message: 'This one is tough! Skip to the next level?',
+        bonusApplied: true
+      };
+    }
+    if (this.consecutiveFailures >= 3) {
+      return {
+        type: 'power_up',
+        message: 'Here\'s a boost to help out!',
+        bonusApplied: true
+      };
+    }
+    if (this.consecutiveFailures >= 2) {
+      return {
+        type: 'hint',
+        message: 'Tip: Try focusing on the left side first.',
+        bonusApplied: false
+      };
+    }
+    return null; // No assist yet
+  }
+}
+```
+
+### Anti-Frustration Features
+
+These are specific quality-of-life mechanics that prevent player drop-off.
+
+```javascript
+const ANTI_FRUSTRATION = {
+  // Show a contextual hint after player is stuck
+  stuckTimer: {
+    idleThreshold: 15000,   // 15 seconds with no progress
+    hintDelay: 20000,       // Show hint at 20 seconds
+    autoSolveOffer: 45000,  // Offer to show solution at 45 seconds
+  },
+
+  // Coyote time — forgive near-misses
+  coyoteTime: {
+    platformJump: 100,      // ms after leaving platform edge
+    hitboxShrink: 0.8,      // Enemy hitbox 80% of visual (favor player)
+  },
+
+  // Retry quality of life
+  retry: {
+    instantRetry: true,      // No loading screen on retry
+    checkpointFrequency: 30, // Seconds between auto-checkpoints
+    keepCollectibles: true,  // Don't lose items on death
+  },
+};
+
+// Stuck detection example
+class StuckDetector {
+  constructor(onHint, onAutoSolve) {
+    this.lastProgressTime = Date.now();
+    this.hintShown = false;
+    this.onHint = onHint;
+    this.onAutoSolve = onAutoSolve;
+    this.checkInterval = setInterval(() => this.check(), 1000);
+  }
+
+  recordProgress() {
+    this.lastProgressTime = Date.now();
+    this.hintShown = false;
+  }
+
+  check() {
+    const stuckTime = Date.now() - this.lastProgressTime;
+
+    if (stuckTime >= ANTI_FRUSTRATION.stuckTimer.autoSolveOffer) {
+      this.onAutoSolve();
+    } else if (stuckTime >= ANTI_FRUSTRATION.stuckTimer.hintDelay && !this.hintShown) {
+      this.onHint();
+      this.hintShown = true;
+    }
+  }
+
+  destroy() {
+    clearInterval(this.checkInterval);
+  }
+}
+```
+
+---
+
 ## Balancing Checklist
 
 ### Before Launch
 
 - [ ] First 5 minutes feel rewarding (early achievements)
-- [ ] Difficulty ramps smoothly (no sudden spikes)
+- [ ] Difficulty ramps smoothly (no sudden spikes — see spike detection below)
 - [ ] Scoring feels fair and understandable
 - [ ] Combo system is satisfying but forgiving
 - [ ] XP curve feels neither too slow nor too fast
 - [ ] Rewards come at varied but regular intervals
 - [ ] High scores are achievable but aspirational
 - [ ] No "impossible" levels or unfair deaths
+
+### Detecting Difficulty Spikes
+
+A difficulty spike occurs when a level is disproportionately harder than its neighbors. Use this formula to flag spikes:
+
+```javascript
+function detectSpikes(levels) {
+  // levels = [{ level: 1, parMoves: 12 }, { level: 2, parMoves: 15 }, ...]
+  const spikes = [];
+  for (let i = 1; i < levels.length; i++) {
+    const prev = levels[i - 1].parMoves;
+    const curr = levels[i].parMoves;
+    const delta = (curr - prev) / prev;  // % increase
+
+    // Flag if difficulty jumps more than 40% between adjacent levels
+    if (delta > 0.4) {
+      spikes.push({
+        level: levels[i].level,
+        increase: Math.round(delta * 100) + '%',
+        severity: delta > 0.8 ? 'CRITICAL' : 'WARNING',
+      });
+    }
+  }
+  return spikes;
+}
+```
+
+**Thresholds:**
+| Jump | Severity | Action |
+|------|----------|--------|
+| < 25% | Normal | Expected progression |
+| 25-40% | Watch | Monitor drop-off at this level |
+| 40-80% | WARNING | Add a breather level before, or split into 2 levels |
+| > 80% | CRITICAL | Players will quit here — must flatten the curve |
+
+**Common spike locations:**
+- Tutorial → first real level (fix: add 1-2 bridge levels)
+- New mechanic introduction (fix: introduce mechanic in isolation first)
+- Color/element count increase (fix: increase by 1, not 2+)
+- Mode transitions (easy → medium → hard in daily challenges)
 
 ### Metrics to Track
 

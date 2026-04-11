@@ -272,6 +272,50 @@ ground.receiveShadows = true;
 
 **Performance rule**: Use 512px shadow maps for mobile, 1024px for desktop. Only shadow-cast meshes that matter.
 
+### Shadow-Receiving for All Meshes
+
+```typescript
+// Enable shadow receiving on all scene meshes (after loading a GLB)
+scene.meshes.forEach((mesh) => {
+  mesh.receiveShadows = true;
+});
+
+// Directional light with explicit shadow bounds (no auto-extend overhead)
+const dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(0.5, -0.7, 0.5), scene);
+dirLight.position = new BABYLON.Vector3(-16, 12, 9);
+dirLight.intensity = 0.5;
+dirLight.shadowMinZ = -5;
+dirLight.shadowMaxZ = 30;
+dirLight.autoUpdateExtends = false; // Manual bounds — faster than auto
+dirLight.orthoLeft = -15;
+dirLight.orthoRight = 25;
+dirLight.orthoBottom = -10;
+dirLight.orthoTop = 20;
+dirLight.shadowOrthoScale = 0;
+```
+
+### GPU Capability Checks
+
+Check GPU support before enabling advanced lighting features:
+
+```typescript
+const caps = engine.getCaps();
+
+// Area lights require half-float textures
+const supportsAreaLights = caps.textureHalfFloat;
+
+// Clustered lights and volumetric lighting require these
+const supportsAdvancedLighting = caps.blendFloat && caps.texelFetch && caps.colorBufferFloat;
+
+// Show fallback UI if requirements aren't met
+if (!supportsAdvancedLighting) {
+  const msg = engine.isWebGPU
+    ? "This device does not support minimum requirements."
+    : "WebGL on this device doesn't meet requirements. Try WebGPU.";
+  showFallbackMessage(msg);
+}
+```
+
 ---
 
 ## Meshes & Geometry
@@ -310,7 +354,7 @@ const ring = MeshBuilder.CreateTorus("ring", { diameter: 2, thickness: 0.3 }, sc
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import "@babylonjs/loaders/glTF"; // Register glTF loader
 
-// Load .glb / .gltf model
+// Load .glb / .gltf model (classic 3-arg form)
 const result = await SceneLoader.ImportMeshAsync(
   "",                    // mesh names ("" = all)
   "/models/",           // root URL
@@ -321,12 +365,55 @@ const character = result.meshes[0];
 character.position = new Vector3(0, 0, 0);
 character.scaling = new Vector3(0.5, 0.5, 0.5);
 
-// Access animations from the file
+// Babylon 9 single-URL form — simpler for full URLs
+await BABYLON.ImportMeshAsync("https://example.com/models/scene.glb", scene);
+
+// Load as Asset Container — adds to scene manually (good for deferred loading)
+const container = await BABYLON.LoadAssetContainerAsync(
+  "https://example.com/models/camera-path.glb",
+  scene,
+  {
+    pluginOptions: {
+      gltf: {
+        // Control animation auto-start behavior
+        animationStartMode: BABYLON.GLTFLoaderAnimationStartMode.NONE, // Don't auto-play
+      }
+    }
+  }
+);
+
+// Inspect what was loaded before adding to scene
+console.log(container.meshes.length, "meshes");
+console.log(container.cameras.length, "cameras");
+console.log(container.animationGroups.length, "animation groups");
+
+// Configure animations, then add everything to the scene
+for (const animGroup of container.animationGroups) {
+  animGroup.loopAnimation = true;
+  animGroup.start(true);
+}
+container.addAllToScene();
+
+// Use a camera from the loaded file
+if (container.cameras.length > 0) {
+  scene.activeCamera = container.cameras[0];
+}
+
+// Access animations from import result
 const animations = result.animationGroups;
 animations[0].start(true); // Loop first animation
 ```
 
 **Supported formats**: `.glb` / `.gltf` (recommended), `.obj`, `.stl`, `.babylon`
+
+**GLTF material tip**: For physically correct light falloff on imported PBR materials:
+
+```typescript
+for (const material of scene.materials) {
+  material.useGLTFLightFalloff = true;  // Match glTF spec light attenuation
+  material.maxSimultaneousLights = 6;   // Allow more lights to affect each mesh
+}
+```
 
 ### Mesh Manipulation
 
@@ -873,6 +960,40 @@ async function loadLevel(levelName: string): Promise<void> {
 
 ## Audio
 
+### Babylon 9 Audio Engine (Recommended)
+
+```typescript
+// Async audio engine — built on Web Audio API with automatic unlock handling
+const audioEngine = await BABYLON.CreateAudioEngineAsync({ volume: 0.5 });
+
+// Babylon auto-injects an unmute button — style it above your game UI
+document.getElementById("babylonUnmuteButton").style.zIndex = 50;
+
+// Create sounds with async factory
+const music = await BABYLON.CreateSoundAsync("music", "audio/music.mp3", {
+  autoplay: true,
+  loop: true,
+  volume: 0,
+});
+
+// Unlock audio (required for mobile — waits for user gesture internally)
+await audioEngine.unlockAsync();
+
+// Smooth volume ramp — fade in over 2 seconds with logarithmic curve
+music.setVolume(0.2, {
+  duration: 2,
+  shape: BABYLON.AudioParameterRampShape.Logarithmic,
+});
+
+// Sound effects
+const hitSound = await BABYLON.CreateSoundAsync("hit", "audio/hit.wav", {
+  volume: 0.8,
+});
+hitSound.play();
+```
+
+### Legacy Audio API (Babylon 7/8)
+
 ```typescript
 import { Sound } from "@babylonjs/core/Audio/sound";
 
@@ -882,12 +1003,6 @@ const music = new Sound("bgm", "audio/music.mp3", scene, null, {
   autoplay: true,
   volume: 0.3,
 });
-
-// Sound effect
-const hitSound = new Sound("hit", "audio/hit.wav", scene, null, {
-  volume: 0.8,
-});
-hitSound.play();
 
 // Spatial 3D audio (attached to mesh)
 const engineSound = new Sound("engine", "audio/engine.mp3", scene, null, {
@@ -899,7 +1014,7 @@ const engineSound = new Sound("engine", "audio/engine.mp3", scene, null, {
 engineSound.attachToMesh(carMesh);
 ```
 
-**Mobile rule**: Audio won't play until user interaction. Start audio in a click/touch handler:
+**Mobile rule**: Audio won't play until user interaction. The Babylon 9 async engine handles this automatically via `unlockAsync()`. For legacy API:
 
 ```typescript
 canvas.addEventListener("pointerdown", () => {
@@ -960,17 +1075,176 @@ const optimizer = new SceneOptimizer(scene, options);
 optimizer.start();
 ```
 
+### Static Mesh Optimization Checklist
+
+For meshes that don't move, interact, or change material — apply all of these together for maximum benefit:
+
+```typescript
+// Full static mesh optimization (apply to every non-interactive mesh)
+function optimizeStaticMesh(mesh: AbstractMesh): void {
+  mesh.freezeWorldMatrix();          // Skip matrix recalc every frame
+  mesh.doNotSyncBoundingInfo = true; // Skip bounding box updates
+  mesh.isPickable = false;           // Skip raycasting (big win if many meshes)
+  mesh.alwaysSelectAsActiveMesh = true; // Skip frustum check (if always visible)
+}
+
+// For meshes that move occasionally — toggle freeze on/off
+mesh.freezeWorldMatrix();
+// ... later, when it needs to move:
+mesh.unfreezeWorldMatrix();
+mesh.position.x = 10;
+mesh.freezeWorldMatrix(); // Re-freeze after move
+```
+
+**Rule**: If users can't click or hover a mesh, set `isPickable = false`. In a scene with 600+ meshes, this alone can cut frame time significantly.
+
+### Scene-Level Optimizations
+
+```typescript
+// 1. Freeze active meshes list — stops per-frame visibility recomputation
+//    Use when camera doesn't move or scene is mostly static
+scene.freezeActiveMeshes();
+// scene.unfreezeActiveMeshes(); // Call when camera/scene changes significantly
+
+// 2. Skip pointer move picking — avoid raycasting on every mouse move
+scene.skipPointerMovePicking = true;
+
+// 3. Disable auto-clear when viewport is fully covered by geometry
+scene.autoClear = false;
+scene.autoClearDepthAndStencil = false;
+
+// 4. Batch material property changes without per-change shader recompilation
+scene.blockMaterialDirtyMechanism = true;
+material.diffuseColor = new Color3(1, 0, 0);
+material.specularColor = new Color3(0, 0, 0);
+material.alpha = 0.8;
+scene.blockMaterialDirtyMechanism = false; // Triggers single recompilation
+
+// 5. Performance priority — one-call aggressive optimization
+//    Intermediate: freezes materials, disables picking, skips pointer events
+//    Aggressive: also skips frustum clipping and bounding info sync
+scene.performancePriority = ScenePerformancePriority.Intermediate;
+// scene.performancePriority = ScenePerformancePriority.Aggressive;
+```
+
+### Color Palette Technique (Reduce Materials to One)
+
+Every unique material adds a draw call. The color palette technique uses a single shared material with a small palette texture, mapping mesh UVs to the desired color region. This can cut draw calls by 10x in large scenes.
+
+```typescript
+// 1. Create a small color palette texture (e.g. 8x1 px strip of colors)
+const paletteTex = new Texture("textures/color-palette.png", scene);
+paletteTex.hasAlpha = false;
+
+// 2. Single shared material for ALL meshes
+const sharedMat = new StandardMaterial("palette", scene);
+sharedMat.diffuseTexture = paletteTex;
+sharedMat.freeze(); // Material never changes — freeze it
+
+// 3. In Blender/3D tool: UV-map each face to the desired color on the palette
+//    Import model — all objects share one material, one draw call batch
+```
+
+**When to use**: Stylized/low-poly scenes with many objects (harbors, cities, landscapes). A real-world scene with 631 meshes dropped from 631 draw calls to 73 by combining this with instancing.
+
+### Mesh Grouping and Container Nodes
+
+```typescript
+// Use TransformNode (not empty Mesh) for grouping/hierarchy
+// TransformNode is excluded from frustum checks — cheaper than an invisible mesh
+const group = new TransformNode("enemyGroup", scene);
+enemy1.parent = group;
+enemy2.parent = group;
+group.position.y = 5; // Moves all children
+```
+
+### Culling Strategy
+
+Trade frustum check accuracy for speed on meshes that are roughly spherical or always near-visible:
+
+```typescript
+// Default — full bounding box check
+mesh.cullingStrategy = AbstractMesh.CULLINGSTRATEGY_STANDARD;
+
+// Bounding sphere only — faster, slight false positives
+mesh.cullingStrategy = AbstractMesh.CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
+
+// Optimistic — assume visible first, verify with sphere
+mesh.cullingStrategy = AbstractMesh.CULLINGSTRATEGY_OPTIMISTIC_INCLUSION;
+```
+
+### Depth Pre-Pass
+
+For meshes with expensive shaders (PBR with many maps), render depth first so fragments behind other objects are rejected early:
+
+```typescript
+material.needDepthPrePass = true;
+// Best for: overlapping PBR meshes, complex fragment shaders
+// Skip for: simple materials, non-overlapping geometry
+```
+
+### Octree Spatial Partitioning
+
+For scenes with 200+ meshes, an octree speeds up visibility selection:
+
+```typescript
+// Scene-level octree for mesh selection
+scene.createOrUpdateSelectionOctree(64, 3); // capacity, maxDepth
+
+// Mesh-level octree for picking/collisions on complex meshes
+mesh.createOrUpdateSubmeshesOctree();
+mesh.useOctreeForPicking = true;
+mesh.useOctreeForCollisions = true;
+```
+
+### Large Scene Constructor Options
+
+For scenes where meshes are frequently added/removed, enable lookup maps at the cost of extra memory:
+
+```typescript
+const scene = new Scene(engine, {
+  useGeometryUniqueIdsMap: true,  // Faster geometry add/remove
+  useMaterialMeshMap: true,       // Faster material lookups
+  useClonedMeshMap: true,         // Faster clone management
+});
+
+// Bulk disposal — prevent recomputation when removing many meshes at once
+scene.blockfreeActiveMeshesAndRenderingGroups = true;
+meshesToRemove.forEach(m => m.dispose());
+scene.blockfreeActiveMeshesAndRenderingGroups = false;
+```
+
+### Asset Pipeline Tips
+
+- **Triangulate faces in Blender before export** — gives you control over polygon/face counts instead of letting the glTF exporter decide
+- **Use the Inspector's wireframe mode** to visually check polygon density and find over-tessellated meshes
+- **Toggle individual meshes** in the Inspector to isolate which mesh is killing FPS (not always the highest poly count)
+- **Compress textures** — use KTX2/Basis Universal for GPU-compressed textures, reducing VRAM by 4-6x
+
 ### Debug Performance
 
 ```typescript
 // Show FPS and draw call count
 scene.debugLayer.show();
 
-// Or manually
+// Detailed instrumentation
+const instrumentation = new SceneInstrumentation(scene);
+instrumentation.captureActiveMeshesEvaluationTime = true;
+instrumentation.captureRenderTargetsRenderTime = true;
+instrumentation.captureFrameTime = true;
+instrumentation.captureRenderTime = true;
+instrumentation.captureDrawCalls = true;
+
 scene.onAfterRenderObservable.add(() => {
   console.log("FPS:", engine.getFps().toFixed(0));
-  console.log("Draw calls:", scene.getEngine().drawCalls);
+  console.log("Draw calls:", instrumentation.drawCallsCounter.current);
+  console.log("Active meshes:", scene.getActiveMeshes().length);
+  console.log("Frame time:", instrumentation.frameTimeCounter.lastSecAverage.toFixed(2), "ms");
 });
+
+// GPU frame time (requires EXT_DISJOINT_TIMER_QUERY — not available in all browsers)
+const engineInstrumentation = new EngineInstrumentation(engine);
+engineInstrumentation.captureGPUFrameTime = true;
 
 // Inspector (dev only)
 import "@babylonjs/inspector";
@@ -1399,28 +1673,95 @@ window.addEventListener("keydown", (e) => {
 
 ### Clustered Lighting (Many Dynamic Lights)
 
-Babylon 9 uses clustered forward rendering to efficiently handle dozens of dynamic lights without performance collapse.
+Babylon 9 uses clustered forward rendering to efficiently handle dozens of dynamic lights without performance collapse. Use `ClusteredLightContainer` to explicitly manage which lights are clustered.
 
 ```typescript
-// Enable clustered lighting (automatic in Babylon 9)
-// No special setup — just add many lights
+// Explicit clustered light container — gives you control over which lights cluster
+const clustered = new BABYLON.ClusteredLightContainer("clustered", [], scene);
+
+const torchLight = new BABYLON.PointLight("torch", new BABYLON.Vector3(5, 3, 10), scene, true);
+torchLight.diffuse = new BABYLON.Color3(1.0, 0.5, 0.1);
+torchLight.intensity = 4;
+torchLight.range = 6;
+clustered.addLight(torchLight);
+
+// Add many lights — clustered rendering keeps it fast
 for (let i = 0; i < 50; i++) {
-  const light = new PointLight(`light_${i}`, randomPosition(), scene);
-  light.intensity = 0.5;
-  light.range = 8;
+  const light = new BABYLON.PointLight(`light_${i}`, randomPosition(), scene, true);
+  light.intensity = 2;
+  light.range = 4;
   light.diffuse = randomColor();
+  clustered.addLight(light);
 }
 // Engine clusters the view frustum into a 3D grid
 // Each pixel only evaluates lights in its cluster — O(1) per light
 ```
 
+**Flickering / blinking lights** — common in sci-fi and horror scenes:
+
+```typescript
+// Procedural flicker using layered sine waves at different frequencies
+let time = 0;
+scene.onBeforeRenderObservable.add(() => {
+  const flicker = 1.0
+    + 0.35 * Math.sin(time * 47)
+    + 0.25 * Math.sin(time * 113)
+    + 0.15 * Math.sin(time * 229);
+  blinkingLight.intensity = Math.max(0, flicker * 8);
+  time += engine.getDeltaTime() * 0.001;
+});
+```
+
 **Use case**: Night scenes with many torches, fireflies, neon signs, explosions.
 **Demo**: https://aka.ms/babylon9CLDemo
+
+### Area Lights (Rectangular Light Emitters)
+
+Physically-based rectangular lights that emit from a surface — like screens, LED panels, and windows. Require `textureHalfFloat` GPU capability.
+
+```typescript
+// Check GPU support first
+if (!engine.getCaps().textureHalfFloat) {
+  console.warn("Area lights not supported on this device");
+}
+
+// Create area light from a mesh (e.g. a TV screen)
+const screenMesh = scene.getMeshByName("Screen");
+const transform = new BABYLON.TransformNode("screenTransform", scene);
+transform.parent = screenMesh;
+transform.rotation.x = Math.PI * 0.5;
+
+// Compute light dimensions from mesh bounds
+screenMesh.computeWorldMatrix(true);
+const bounds = screenMesh.getBoundingInfo().boundingBox.extendSizeWorld;
+const w = bounds.x * 2;
+const h = bounds.y * 2;
+
+// Area light — emits from a rectangle
+const areaLight = new BABYLON.RectAreaLight("screenLight", BABYLON.Vector3.Zero(), w, h, scene);
+areaLight.parent = transform;
+areaLight.intensity = 2;
+
+// Process texture for area light emission (generates SH coefficients)
+const textureProcessor = new BABYLON.AreaLightTextureTools(engine);
+const sourceTexture = new BABYLON.Texture("textures/screen-content.png", scene);
+areaLight.emissionTexture = await textureProcessor.processAsync(sourceTexture);
+
+// Apply emissive material to the screen mesh itself (so it glows visually)
+const screenMat = new BABYLON.StandardMaterial("screenMat", scene);
+screenMat.disableLighting = true;
+screenMat.emissiveTexture = sourceTexture;
+screenMat.backFaceCulling = false;
+screenMesh.material = screenMat;
+```
+
+**Use case**: Monitors, neon signs, windows, LED panels, display boards.
+**Demo**: https://aka.ms/babylon9ALDemo
 
 ### Volumetric Lighting (God Rays)
 
 ```typescript
-// Volumetric light scattering — light shafts through fog/dust
+// Classic post-process god rays
 import { VolumetricLightScatteringPostProcess } from "@babylonjs/core/PostProcesses/volumetricLightScatteringPostProcess";
 
 const godrays = new VolumetricLightScatteringPostProcess(
@@ -1433,7 +1774,29 @@ godrays.weight = 0.5;
 godrays.density = 0.8;
 ```
 
-**Use case**: Cathedrals, warehouses, forests with sunbeams.
+**Babylon 9 Node Render Graph** — advanced volumetric lighting via render graph snippets:
+
+```typescript
+// Node Render Graph — composable render pipeline defined visually or via snippets
+const nrg = await BABYLON.NodeRenderGraph.ParseFromSnippetAsync("9F3FV1#16", scene, {
+  debugTextures: true,
+});
+
+nrg.onBuildObservable.add(() => {
+  // Configure volumetric lighting parameters after build
+  const lightVolume = nrg.getBlockByName("lightingVolume").task.lightingVolume;
+  lightVolume.frequency = engine.isWebGPU ? 1 : 0;
+  lightVolume.tesselation = engine.hostInformation.isMobile ? 256 : 1024;
+
+  const volumetricLighting = nrg.getBlockByName("volumetricLighting").task;
+  const scale = 0.04;
+  volumetricLighting.lightPower.set(0.18 * scale, 0.2 * scale, 0.22 * scale);
+});
+
+await nrg.buildAsync();
+```
+
+**Use case**: Cathedrals, warehouses, forests with sunbeams, sci-fi corridors.
 **Demo**: https://aka.ms/babylon9vlDemo
 
 ### Gaussian Splats (Photorealistic 3D Captures)
@@ -1481,15 +1844,39 @@ retargeted.start(true);
 Babylon 9 introduces a node-based visual editor for particle systems — design complex effects without code.
 
 ```typescript
-// Load a node particle system exported from the editor
+// Single node particle system from file
 import { NodeParticleSystem } from "@babylonjs/core/Particles/Node/nodeParticleSystem";
 
 const nps = await NodeParticleSystem.ParseFromFileAsync("", "particles/fire.json", scene);
 nps.emitter = torchMesh;
 nps.start();
+
+// Node Particle System SET from snippet — loads multiple coordinated particle systems
+// Snippet IDs come from the Babylon.js snippet server (designed in the NPE visual editor)
+const nodeSet = await BABYLON.NodeParticleSystemSet.ParseFromSnippetAsync("ICTSOG#1");
+const builtSet = await nodeSet.buildAsync(scene);
+builtSet.start();
+
+// Position all systems in the set to the same emitter point
+const emitPos = new BABYLON.Vector3(8, 5, 15);
+for (const system of builtSet.systems) {
+  system.emitter.copyFrom(emitPos);
+}
+
+// Control individual systems — e.g., burst emission on one system
+const burstSystem = builtSet.systems[3];
+if (burstSystem) {
+  burstSystem.emitRate = 0; // Disable continuous emission
+  scene.registerBeforeRender(() => {
+    const now = performance.now() * 0.001;
+    if (shouldBurst(now)) {
+      burstSystem.manualEmitCount = 1 + Math.floor(Math.random() * 4);
+    }
+  });
+}
 ```
 
-**Use case**: Complex effects (fire, magic, weather) designed visually.
+**Use case**: Complex effects (fire, magic, weather, sparkles) designed visually.
 **Demo**: https://aka.ms/babylon9NPEDemo
 
 ### Particle Flow Maps
