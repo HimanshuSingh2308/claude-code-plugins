@@ -88,6 +88,14 @@ Compare what's changed since the last scan:
 
 5. **New directories** — quick `ls` of top-level dirs, compare with cached list
 
+6. **Knowledge graph (incremental)** — if `.claude/knowledge_graph.json` exists:
+   - Detect source files changed since `meta.generatedAt` via `git diff --name-only`
+   - For 1-3 changed files: parse inline and update entries
+   - For 4+ changed files: spawn `kg-file-parser` agent (haiku) per file
+   - Rebuild `importedBy` reverse map if imports changed
+   - Update `meta.generatedAt`
+   - If no KG exists, skip (will be generated on next `/load-project` or deep refresh)
+
 #### Deep Refresh
 
 Everything from the quick refresh, PLUS:
@@ -104,6 +112,11 @@ Everything from the quick refresh, PLUS:
 5. **CI/CD** — re-read all workflow files
 6. **Custom commands** — re-list .claude/commands/
 7. **AGENTS.md** — re-read if exists
+
+8. **Knowledge graph (full regeneration)**:
+   - Spawn `kg-generator` agent (sonnet) with project path, language, source directory, framework
+   - Agent reads all source files and generates fresh `.claude/knowledge_graph.json`
+   - If no KG existed before, also update CLAUDE.md with KG instructions
 
 ### Step 5: Update Knowledge File
 

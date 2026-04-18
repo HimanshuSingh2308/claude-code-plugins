@@ -32,9 +32,13 @@ Where `{sanitized-path}` is the project path with `/` replaced by `-` and leadin
    - Verify the project path still exists
    - Check `git branch --show-current` for current branch
    - Check `git log --oneline -1` for latest commit
-3. Update `lastAccessed` in the registry
-4. Present the cached summary (with branch/commit freshened)
-5. Skip to Step 7 (change directory)
+3. Check if `.claude/knowledge_graph.json` exists in the project:
+   - If it exists and `meta.generatedAt` is less than 7 days old: note "Knowledge graph: cached"
+   - If missing or stale: note that KG needs generation (will run Step 6.5)
+4. Update `lastAccessed` in the registry
+5. Present the cached summary (with branch/commit freshened)
+6. If KG needs generation, run Step 6.5 before proceeding
+7. Skip to Step 7 (change directory)
 
 **If the knowledge file DOES NOT exist or is older than 7 days:**
 Continue with full scan (Steps 3-6), then save results.
@@ -151,6 +155,60 @@ scannedAt: {ISO timestamp}
 
 Also update `~/.claude/projects/{sanitized-path}/memory/MEMORY.md` to include a pointer to this file if not already present.
 
+### Step 6.5: Generate Knowledge Graph
+
+If the project has a source directory with 10+ source files, generate a code knowledge graph for fast symbol lookup and dependency tracking.
+
+1. **Check for existing graph**: Look for `<project-root>/.claude/knowledge_graph.json`
+   - If it exists and `meta.generatedAt` is less than 7 days old: skip generation (use cached graph)
+   - If missing or stale: proceed with generation
+
+2. **Detect source directory** based on the language/framework:
+   - Dart/Flutter: `lib/`
+   - TypeScript/JavaScript: `src/` (or project root if no `src/`)
+   - Python: main package directory or `src/`
+   - Go: project root (`.go` files)
+   - Rust: `src/`
+   - Java: `src/main/java/`
+
+3. **Count source files** in the detected directory. If fewer than 10, skip KG generation (project is small enough to scan directly).
+
+4. **Spawn the `kg-generator` agent** (sonnet) with:
+   - Project path (absolute)
+   - Detected language
+   - Source directory (relative)
+   - Detected framework (if any)
+
+5. The agent will:
+   - Read all source files
+   - Extract symbols, methods, imports, line ranges
+   - Build reverse dependency maps
+   - Detect framework-specific patterns (providers, routes, DI)
+   - Write `.claude/knowledge_graph.json`
+
+6. **Update CLAUDE.md** with knowledge graph instructions:
+   - If CLAUDE.md exists: check if it already has a `## Knowledge Graph` section
+     - If not: append the KG instructions section
+   - If CLAUDE.md doesn't exist: create it with KG instructions
+
+   The KG instructions section:
+   ```markdown
+   ## Knowledge Graph
+
+   This project has a code knowledge graph at `.claude/knowledge_graph.json`.
+
+   **ALWAYS check the knowledge graph before reading source files:**
+   1. Look up symbols in `symbols.<Name>` for exact file path and line range
+   2. Check `files.<path>.importedBy` to find all files affected by a change
+   3. Use `providers`/`routes`/`dataFlows` for architectural understanding
+   4. Read only relevant line ranges (offset/limit) — avoid reading entire files
+   5. After making code changes, run `/kg-update` to keep the graph current
+   ```
+
+7. **Update registry**: Set `hasKnowledgeGraph: true` in the project's registry entry.
+
+**Note**: Knowledge graph generation runs in the background via the agent. If it takes too long (very large projects), it won't block the project load — the summary will note that KG generation is in progress.
+
 ### Step 7: Update Project Registry
 
 Add/update entry in `~/.claude/project-registry.json`:
@@ -186,6 +244,10 @@ Display a concise summary:
 - 15 npm scripts available
 - Jest test setup configured
 - GitHub Actions CI/CD
+
+### Knowledge Graph
+- {N} files indexed, {M} symbols mapped
+- Run `/kg-update` after code changes to keep it fresh
 
 ### Quick Actions
 - `npm run dev` - Start development server
