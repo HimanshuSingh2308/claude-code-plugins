@@ -126,7 +126,31 @@ Assemble the complete knowledge graph with all sections:
 }
 ```
 
+#### 6a. Ensure `.claude/` directory exists
+
+Before writing, run:
+```bash
+mkdir -p <project-root>/.claude
+```
+
+This prevents silent write failures when the directory doesn't exist yet.
+
+#### 6b. Write the JSON file
+
 Write to `<project-root>/.claude/knowledge_graph.json` using the Write tool.
+
+#### 6c. Verify the write succeeded
+
+After writing, **always** verify by reading the first 5 lines of the written file:
+```
+Read <project-root>/.claude/knowledge_graph.json (limit: 5)
+```
+
+If the read fails or returns empty:
+1. Check that `<project-root>/.claude/` exists (run `ls -la <project-root>/.claude/`)
+2. Retry the write once
+3. Verify again after retry
+4. If it still fails, report the exact error and path to the user — do NOT silently continue
 
 ### Step 7: Return Summary
 
@@ -154,7 +178,9 @@ Knowledge graph generated:
 - If a file can't be read: skip it, note in summary
 - If the project has no detectable source files: report error
 - If the source directory doesn't exist: report error
-- If JSON write fails: report the error with the path attempted
+- If `.claude/` directory doesn't exist: create it with `mkdir -p` before writing
+- If JSON write fails: retry once after verifying the directory exists. If retry also fails, report the exact error, the path attempted, and the directory listing of the parent folder
+- **Never silently swallow a write failure.** The caller depends on the KG file existing after this agent completes. If it doesn't exist, the entire downstream workflow (CLAUDE.md update, registry update) will operate on stale/missing data
 
 ## Batch Processing Awareness
 

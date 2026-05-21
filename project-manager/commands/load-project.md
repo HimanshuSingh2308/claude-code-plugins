@@ -186,12 +186,34 @@ If the project has a source directory with 10+ source files, generate a code kno
    - Detect framework-specific patterns (providers, routes, DI)
    - Write `.claude/knowledge_graph.json`
 
-6. **Update CLAUDE.md** with knowledge graph instructions:
-   - If CLAUDE.md exists: check if it already has a `## Knowledge Graph` section
-     - If not: append the KG instructions section
-   - If CLAUDE.md doesn't exist: create it with KG instructions
+6. **Update CLAUDE.md** with knowledge graph instructions (KG-first approach):
 
-   The KG instructions section:
+   **NEVER read the entire CLAUDE.md file.** Use targeted lookups instead:
+
+   **6a. Check if CLAUDE.md exists:**
+   ```bash
+   test -f <project-root>/CLAUDE.md && echo "exists" || echo "missing"
+   ```
+
+   **6b. If CLAUDE.md does NOT exist:** Create it with just the KG instructions section (see template below).
+
+   **6c. If CLAUDE.md exists — use KG-first lookup to find the section:**
+
+   First, check if the knowledge graph has an entry for `CLAUDE.md`:
+   - Look in the just-generated KG's `files` section for a `CLAUDE.md` entry
+   - If the KG has line ranges for a `## Knowledge Graph` section, read only those lines using `Read` with `offset`/`limit`
+
+   If the KG has no CLAUDE.md entry (it usually won't since CLAUDE.md isn't source code), use Grep to search for the section header:
+   ```
+   Grep pattern="^## Knowledge Graph" path="<project-root>/CLAUDE.md"
+   ```
+
+   - If Grep finds the header: the section already exists — **do nothing** (skip the update)
+   - If Grep finds no match: append the KG instructions section to the end of the file using Edit (match the last line of the file as `old_string` and append the new section after it)
+
+   **IMPORTANT:** Do NOT read the full CLAUDE.md to check for the section. A Grep for the header is sufficient. The file could be hundreds of lines long and reading it wastes context.
+
+   **The KG instructions section to append/create:**
    ```markdown
    ## Knowledge Graph
 

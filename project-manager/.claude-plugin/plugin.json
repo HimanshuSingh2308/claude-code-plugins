@@ -1,7 +1,7 @@
 {
   "name": "project-manager",
   "description": "Project session management toolkit with code knowledge graph. Switch contexts, track projects, load metadata, scaffold from templates, and generate structured code indexes for fast symbol lookup. Provides commands: /load-project, /recent-projects, /project-info, /new-project, /refresh-project, /kg-update",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": {
     "name": "Himanshu Singh",
     "url": "https://github.com/HimanshuSingh2308"
