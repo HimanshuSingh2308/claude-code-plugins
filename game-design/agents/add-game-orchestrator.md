@@ -21,6 +21,7 @@ Spawn the `game-builder` agent with:
 - The extracted variables from Phase 1
 - The full PRD content
 - Instruction to build in `apps/web-astro/` (Astro path)
+- **CRITICAL REMINDER**: The game MUST call `window.gameHeader.init()` with `buttons: ['sound', 'leaderboard', 'auth']` in its initialization code. Without this, the shared header won't show Sign In, Leaderboard, or Sound buttons. This applies to ALL game architectures (componentized or single-file IIFE).
 
 Wait for completion — the game file must exist before integration steps.
 
@@ -45,6 +46,7 @@ After all Phase 3 agents complete, spawn the `game-integration-checker` agent to
 - No missing script includes
 - Achievement IDs are registered
 - Homepage, /games/ index, and category pages all include the new game
+- `gameHeader.init` is called in the game JS with `buttons: ['sound', 'leaderboard', 'auth']`
 - Build passes (`npx nx run shared:build` and `npx nx run web-astro:build`)
 
 ### Error Handling

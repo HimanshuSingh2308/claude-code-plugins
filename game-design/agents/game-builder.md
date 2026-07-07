@@ -35,6 +35,21 @@ All new games are built in the Astro app using a **componentized architecture**.
 
 Not every game needs all files. For simple games (< 200 lines total), a single IIFE is acceptable. For anything larger, split into components. Rule: **if any file exceeds ~300 lines, split further**.
 
+**CRITICAL — Even single-file IIFE games MUST include `gameHeader.init()` in their INIT section:**
+```javascript
+if (window.gameHeader) {
+  window.gameHeader.init({
+    title: GAME_NAME,
+    icon: GAME_EMOJI,
+    gameId: GAME_SLUG,
+    buttons: ['sound', 'leaderboard', 'auth'],
+    onSound: () => { toggleMute(); },
+    soundBtnId: 'soundBtn',
+  });
+}
+```
+Without this call, the shared header won't show Sign In, Leaderboard, or Sound buttons. This was a bug in Cosmo Merge — don't repeat it.
+
 ### Component Communication
 
 Components communicate through the engine — never directly between each other:
