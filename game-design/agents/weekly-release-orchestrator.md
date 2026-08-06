@@ -66,6 +66,7 @@ Write state JSON to ~/Documents/weekly-games/workflows/{state.id}.json
      "phases": {
        "scout": { "status": "pending" },
        "design": { "status": "pending" },
+       "visualDesign": { "status": "pending" },
        "build": { "status": "pending" },
        "review": { "status": "pending" },
        "qa": { "status": "pending" },
@@ -94,6 +95,7 @@ Each phase has: `status: 'pending' | 'running' | 'completed' | 'failed'`
 | Root | `id` (YYYY-MM-DD-HHmmss), `currentPhase`, `startedAt`, `lastUpdated`, `dryRun` |
 | scout | `reportPath`, `selectedGame: { concept, score, rationale }` |
 | design | `prdPath`, `gameSlug`, `gameName`, `extractedValues` |
+| visualDesign | `projectUrl`, `designDir`, `screensRendered[]`, `breakpointsRendered[]`, `tokens: { themeColor, accentColor, palette[] }`, `is3D`, `finalized: boolean` |
 | build | `branchName`, `commits[]`, `filesCreated[]`, `filesModified[]` |
 | review | `iterations: ReviewIteration[]`, `finalScore` |
 | qa | `iterations: QAIteration[]`, `deferredIssues: string[]` (GitHub URLs) |
@@ -170,11 +172,86 @@ Each phase has: `status: 'pending' | 'running' | 'completed' | 'failed'`
 5. Save to state: design.prdPath, design.extractedValues
 6. Update: state.slug = gameSlug, state.currentPhase = 'design', state.lastUpdated = now()
 7. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
-8. Transition to BUILD phase
+8. Transition to VISUAL_DESIGN phase
 ```
 
 **Output Artifacts**:
 - PRD document: `~/Documents/weekly-games/{game-slug}-prd.md`
+
+---
+
+### Phase 2.5: Visual Design (Gate — blocks BUILD)
+
+**Objective**: Settle what the game looks like, at every screen size, before any of it is
+built. The PRD defines behaviour; this defines appearance. Without it `game-builder`
+invents the visual language while simultaneously solving game logic, and the result is
+found in VISUAL_QA — by which point fixing it means rewriting working render code.
+
+**Execution**:
+```
+1. Log: "Starting VISUAL_DESIGN phase for {gameName}"
+2. Determine is3D: design.extractedValues.rendering === '3d' (Babylon.js games)
+3. Read the design system's own guidance FIRST:
+   - mcp__claude-design__read_design_skill
+   - mcp__claude-design__get_claude_design_prompt
+   Do not assume conventions — they are versioned there, not in this agent.
+4. mcp__claude-design__list_design_systems
+5. mcp__claude-design__create_project — name: {game-slug}
+6. mcp__claude-design__write_files — one self-contained HTML/CSS file per screen:
+     - Landing / pre-game (GameLanding: hero, tagline, still, Play CTA, 3 features)
+     - Main menu or mode select
+     - In-game HUD, at rest AND at peak density
+     - Level-up / upgrade / shop (only if the PRD defines one)
+     - Pause
+     - Game over / run summary
+7. mcp__claude-design__render_preview — EVERY screen at EVERY breakpoint:
+     390x844 (mobile portrait), 844x390 (mobile landscape),
+     820x1180 (tablet), 1440x900 (desktop)
+   Render each; never extrapolate one from another.
+8. Validate (ALL must pass — this is a gate):
+     - Every required screen rendered at all 4 breakpoints
+     - No horizontal overflow at 390px
+     - Touch targets >= 44x44px on both mobile breakpoints
+     - All text >= 4.5:1 against its background
+     - accentColor >= 4.5:1 against its button label
+     - themeColor != accentColor, each chosen deliberately
+9. mcp__claude-design__finalize_plan
+10. Export to ~/Documents/weekly-games/{game-slug}-design/
+11. Save to state: visualDesign.projectUrl, .designDir, .screensRendered,
+    .breakpointsRendered, .tokens, .is3D, .finalized = true
+12. Update: state.currentPhase = 'visual_design', state.lastUpdated = now()
+13. PERSIST state
+14. Transition to BUILD phase
+```
+
+**GATE: do not transition to BUILD until `finalized: true`.** A partially designed game is
+worse than an undesigned one — BUILD will follow it as far as it goes and improvise the
+rest, producing a game that is half one visual language and half another.
+
+**3D exception (`is3D === true`)**
+
+Do NOT design 3D assets in Claude Design: no models, meshes, materials, lighting rigs,
+camera framing or in-world environment art. Those are built in Babylon.js during BUILD.
+Mocking them in HTML/CSS produces a target that cannot be implemented and that the builder
+will burn time trying to match.
+
+Everything that is not the 3D scene still applies, and matters more for a 3D game because
+it is the only part a mockup can settle:
+- Landing, menus, pause, game over, upgrade screens — all still required
+- The 2D HUD overlaying the 3D viewport — score, timers, health, minimap, buttons
+- Palette and typography, which the Babylon scene then samples for its materials
+- All 4 breakpoints, especially mobile landscape — 3D games are usually landscape-locked
+  and that is the breakpoint most often skipped
+- The rotate/orientation gate, if landscape-locked
+
+For the viewport itself, produce a flat placeholder block at the correct aspect and
+position — not an illustration of the 3D scene. Skip the `css-game-art` step entirely.
+
+Reference 3D games: `chess-3d`, `cricket-blitz`, `drift-legends`, `lumble`, `strait-runner`.
+
+**Output Artifacts**:
+- Design project URL (recorded in workflow state)
+- `~/Documents/weekly-games/{game-slug}-design/` — mockups, tokens, CSS art
 
 ---
 
@@ -195,7 +272,19 @@ Each phase has: `status: 'pending' | 'running' | 'completed' | 'failed'`
    git checkout -b feature/game-{gameSlug}
 
 4. Spawn agent: add-game-orchestrator
-   - Input: design.prdPath, design.extractedValues
+   - Input: design.prdPath, design.extractedValues,
+            visualDesign.designDir, visualDesign.projectUrl, visualDesign.tokens,
+            visualDesign.is3D
+   - PRECONDITION: visualDesign.finalized === true. If not, do not spawn — return to
+     VISUAL_DESIGN. Building against an unfinalized design is how half the game ends up
+     in one visual language and half in another.
+   - The design is the source of truth for anything visual: palette, layout, spacing,
+     CSS art, responsive behaviour at all 4 breakpoints. The PRD is the source of truth
+     for mechanics. Where they disagree, design wins on appearance, PRD wins on
+     behaviour. game-builder re-invents neither.
+   - If is3D: the design covers only the 2D UI and HUD overlaying the viewport. The
+     Babylon scene, models, materials and lighting are built here, in this phase, from
+     the PRD — there are deliberately no design mockups for them.
    - The orchestrator coordinates 6 sub-agents with optimized models:
      - game-prd-extractor (haiku) — extract GAME_* variables
      - game-builder (opus) — build game files (Astro path)
@@ -663,6 +752,7 @@ only handles deferred issue creation and metrics collection.
      totalDuration: now() - state.startedAt,
      scoutDuration: phase_duration('scout'),
      designDuration: phase_duration('design'),
+     visualDesignDuration: phase_duration('visual_design'),
      buildDuration: phase_duration('build'),
      reviewIterations: review.iterations.length,
      qaIterations: qa.iterations.length,

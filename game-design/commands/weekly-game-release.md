@@ -18,6 +18,7 @@ This command orchestrates the entire weekly game release by coordinating:
 | `game-trend-scout` | Skill | Research trends, rank game concepts |
 | `product-designer` | Agent | Web research + competitive analysis + PRD creation |
 | `game-design-prd` | Skill | PRD template (used by product-designer agent) |
+| Claude Design MCP | External | Visual design: screens, CSS art, responsive mockups (Phase 2.5) |
 | `add-game-orchestrator` | Agent | Implement game in monorepo (coordinates 6 sub-agents) |
 | `mobile-game-ux` | Knowledge | Mobile UX patterns |
 | `animation-patterns` | Knowledge | Animation best practices |
@@ -147,7 +148,100 @@ Validation:
   - Extractable values (GAME_NAME, GAME_SLUG, etc.)
 ```
 
+### Phase 2.5: Visual Design (Gate — blocks Phase 3)
+
+**The PRD says what the game does. This phase decides what it looks like, before a line of
+it is built.** Without it `game-builder` invents the visual language while it is also
+solving game logic, which is where inconsistent palettes, desktop-only layouts and
+"designed at 1440px, unplayable at 390px" come from. Discovering that in Phase 5 (Visual
+QA) means rebuilding rendering code that already works.
+
+```yaml
+Tooling: Claude Design MCP (mcp__claude-design__*)
+Input: ~/Documents/weekly-games/{game-slug}-prd.md  (Phase 2 output)
+Output:
+  - Design project URL (record in workflow state)
+  - ~/Documents/weekly-games/{game-slug}-design/  (exported mockups + tokens)
+
+Steps:
+  - mcp__claude-design__read_design_skill / get_claude_design_prompt
+      Fetch the design system's own current guidance FIRST. Do not assume the
+      conventions — they are versioned there, not here.
+  - mcp__claude-design__list_design_systems, then create_project for {game-slug}
+  - mcp__claude-design__write_files — build each screen as self-contained HTML/CSS
+  - mcp__claude-design__render_preview — render EVERY screen at EVERY breakpoint below
+  - mcp__claude-design__finalize_plan — lock the design once previews are approved
+
+Required screens (all of them, or Phase 3 has gaps to invent):
+  - Landing / pre-game (GameLanding: hero, tagline, still, Play CTA, 3 features)
+  - Main menu or mode select
+  - In-game HUD at rest and at peak density (worst-case overlap is the real test)
+  - Level-up / upgrade / shop, if the PRD has one
+  - Pause
+  - Game over / run summary
+
+Required breakpoints (render each, do not extrapolate):
+  - Mobile portrait   390x844
+  - Mobile landscape  844x390    <- the one that gets skipped and then blocks release
+  - Tablet            820x1180
+  - Desktop           1440x900
+
+Required design tokens (Phase 3 consumes these verbatim):
+  - themeColor  — PWA/browser chrome. MAY be light.
+  - accentColor — brand colour; the Play button is built from it
+  - Full palette, typography scale, spacing scale, radius/border language
+  - CSS art assets: characters, environment, particles, icons
+    (apply the `css-game-art` knowledge skill — no external image deps)
+    3D GAMES: skip this line only. See "3D exception" below.
+
+Validation (ALL must pass before Phase 3 starts):
+  - Every required screen rendered at all 4 breakpoints
+  - No horizontal overflow at 390px on any screen
+  - Touch targets >= 44x44px on both mobile breakpoints
+  - Text vs its background >= 4.5:1 everywhere; accentColor vs its label >= 4.5:1
+  - themeColor and accentColor are distinct values, each chosen on purpose
+  - Design finalized via finalize_plan (not left as a draft)
+```
+
+**Gate: do not start Phase 3 until `finalize_plan` has been called.** A half-finished
+design is worse than none — Phase 3 will follow it partway and improvise the rest.
+
+**Contrast is checked here, not later.** `GameLanding` shades the accent at build time so
+the Play label clears 4.5:1, but that only rescues the button. A palette whose HUD text
+fails against its own background has to be re-picked, and by Phase 5 it is baked into
+render code. Six of the 23 existing games shipped accents that failed this.
+
+#### 3D exception (`"rendering": "3d"` / Babylon.js games)
+
+**Do not design 3D assets in Claude Design.** No models, meshes, materials, lighting rigs,
+camera framing or in-world environment art. Those are built in Babylon.js in Phase 3 —
+mocking them as HTML/CSS produces a picture that cannot be implemented and that a builder
+will then waste time trying to match.
+
+Everything in this phase that is **not** the 3D scene still applies, and for a 3D game it
+matters more, not less, because it is the only part a mockup can settle:
+
+- Landing / pre-game, menus, pause, game over, upgrade screens — all still designed
+- The 2D HUD **overlaying** the 3D viewport — score, timers, health, minimap, buttons
+- Palette and typography, which the Babylon scene then samples for its own materials
+- All 4 breakpoints, especially **mobile landscape** — 3D games are usually landscape-only
+  and that is the breakpoint most likely to be skipped
+- The rotate/orientation gate, if the game is landscape-locked
+
+For the viewport itself, deliver a **flat placeholder block at the correct aspect and
+position**, not an illustration of the 3D scene. The deliverable answers "what does the UI
+around and on top of the 3D view look like, at every size" — nothing more.
+
+Existing 3D games for reference: `chess-3d`, `cricket-blitz`, `drift-legends`, `lumble`,
+`strait-runner`.
+
 ### Phase 3: Build
+
+**Phase 3 consumes BOTH the PRD and the Phase 2.5 design.** Pass the design directory and
+project URL to `add-game-orchestrator` alongside the PRD path. The design is the source of
+truth for anything visual — palette, layout, spacing, CSS art, responsive behaviour — and
+the PRD for anything behavioural. Where they disagree, the design wins on appearance and
+the PRD wins on mechanics; do not silently re-invent either.
 
 **CRITICAL: You MUST use the `add-game-orchestrator` agent for this phase, NOT `game-builder` directly.**
 
@@ -171,6 +265,12 @@ The orchestrator coordinates 6 sub-agents that handle ALL integration points:
 ```yaml
 Agent: add-game-orchestrator (spawns sub-agents + knowledge skills)
 Branch: feature/game-{slug}
+Inputs (BOTH required):
+  - PRD:    ~/Documents/weekly-games/{game-slug}-prd.md          (Phase 2)
+  - Design: ~/Documents/weekly-games/{game-slug}-design/         (Phase 2.5)
+            + design project URL from workflow state
+  Design governs appearance (palette, layout, spacing, CSS art, responsive).
+  PRD governs mechanics. Neither is to be re-invented by game-builder.
 
 MANDATORY Sub-Agents (all must complete):
   - game-builder: Creates game files
@@ -463,6 +563,7 @@ When using `--dry-run`, the orchestrator simulates all phases and outputs:
 |-------|--------|------------|
 | Scout | Simulated | Top concept: "Emoji Match" (score: 8.2) |
 | Design | Simulated | PRD with 14 sections |
+| Visual Design | Simulated | 6 screens x 4 breakpoints, tokens + CSS art |
 | Build | Simulated | 3 files to create, 3 to modify |
 | Review | Estimated | Initial review pending |
 | Visual QA | Estimated | Desktop + mobile screenshots pending |
