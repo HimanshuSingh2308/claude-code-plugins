@@ -109,19 +109,49 @@ Achievements from PRD (5–10 is ideal):
   "id": "GAME_SLUG",
   "name": "GAME_NAME",
   "icon": "GAME_EMOJI",
-  "title": "GAME_NAME | Weekly Arcade - GAME_DESC_SHORT",
+  "title": "Play GAME_NAME Online Free - GAME_DESC_SHORT",
   "description": "GAME_OG_DESC",
   "keywords": "GAME_KEYWORDS",
   "url": "/games/GAME_SLUG/",
   "themeColor": "GAME_THEME_COLOR",
-  "accentColor": "GAME_THEME_COLOR",
+  "accentColor": "GAME_ACCENT_COLOR",
   "genres": GAME_GENRE,
-  "ratingValue": "4.8",
-  "ratingCount": "500",
   "category": "arcade",
-  "rendering": "canvas"
+  "rendering": "canvas",
+  "tips": ["5-6 concrete strategy tips, each a real insight about this game"],
+  "howToPlay": "One paragraph: controls first, then the win condition.",
+  "similarTo": ["Well-known games this resembles"],
+  "aboutGame": "2-4 sentences of genuine context: what it is, what makes it different, session length.",
+  "faq": [{ "q": "Is GAME_NAME free to play online?", "a": "Yes. …" }]
 }
 ```
+
+**`title`**: 50-60 characters, keyword first, no brand suffix — it does not fit. The
+existing 23 all read `Play {Name} Online Free - {what it is}`.
+
+**`description`**: 150-160 characters. Under 150 wastes SERP width; over 160 truncates.
+It is used four times — meta description, `og:description`, `twitter:description`, and the
+landing hero — so it has to read as human copy, not a keyword list.
+
+**`themeColor` vs `accentColor` are not the same thing and must not be copied from each
+other.** `themeColor` is the PWA/browser-chrome colour and may legitimately be near-white
+on a light-themed game. `accentColor` is the brand colour, and the Play button is built
+from it. Tiny Tycoon has `themeColor: #FFF8F0` — when the button used `themeColor` it
+rendered as white text on a white button.
+
+**NEVER add `ratingValue` or `ratingCount`.** This template used to seed every game with
+`"4.8"` / `"500"`. Nothing on the site collects ratings and no endpoint stores any, so
+every one of those numbers was invented. Google requires aggregate ratings to be genuinely
+collected and shown on the page; marking up invented ones is the case that rule exists to
+catch, and a structured-data manual action strips rich results for the **whole domain**,
+including the FAQ and breadcrumb results these pages legitimately earn. `GameLayout` no
+longer accepts the props. `datePublished` is absent for the same reason — nothing records
+ship dates, so any value would be a guess dressed as data.
+
+`tips`, `howToPlay`, `similarTo`, `aboutGame` and `faq` are not optional padding: they are
+the entire indexable body of the page (see 2A.2). Aim for 400+ words across them. `similarTo`
+should name real, well-known games — they are comparison text for "games like X" queries,
+not internal links, so external titles are correct there.
 
 ### 2A.2 Game Page
 
@@ -130,7 +160,14 @@ Achievements from PRD (5–10 is ideal):
 ```astro
 ---
 import GameLayout from '../../layouts/GameLayout.astro';
+import GameLanding from '../../components/GameLanding.astro';
 import gameData from '../../data/games/GAME_SLUG.json';
+
+const features = [
+  { icon: 'EMOJI', title: 'Short Hook', desc: 'One concrete thing about this game' },
+  { icon: 'EMOJI', title: 'Short Hook', desc: 'Grounded in a real mechanic, not marketing' },
+  { icon: 'EMOJI', title: 'Short Hook', desc: 'Something a player would actually care about' },
+];
 ---
 
 <GameLayout
@@ -144,9 +181,27 @@ import gameData from '../../data/games/GAME_SLUG.json';
   themeColor={gameData.themeColor}
   accentColor={gameData.accentColor}
   genres={gameData.genres}
-  ratingValue={gameData.ratingValue}
-  ratingCount={gameData.ratingCount}
+  tips={gameData.tips}
+  howToPlay={gameData.howToPlay}
+  similarTo={gameData.similarTo}
+  aboutGame={gameData.aboutGame}
+  faq={gameData.faq}
 >
+  <!-- REQUIRED. Without this the page has no indexable body — see 2A.2b -->
+  <Fragment slot="landing">
+    <GameLanding
+      gameName={gameData.name}
+      icon={gameData.icon}
+      tagline="Six words that carry the hook."
+      description={gameData.description}
+      themeColor={gameData.themeColor}
+      accentColor={gameData.accentColor}
+      features={features}
+      howToPlay={gameData.howToPlay}
+      screenshotSrc="/images/thumbnails/GAME_SLUG.svg"
+    />
+  </Fragment>
+
   <!-- Game CSS variables -->
   <Fragment slot="head">
     <style>
@@ -202,6 +257,49 @@ import gameData from '../../data/games/GAME_SLUG.json';
   .game-container { /* ... */ }
 </style>
 ```
+
+### 2A.2b The landing section is not optional
+
+A game page has exactly two states, and `GameLanding` is what creates the first one:
+
+| State | On screen | Who sees it |
+|-------|-----------|-------------|
+| Landing up | Hero, tagline, description, still, Play CTA, features, how-to-play, then the whole SEO block and More Games. Body scrolls. | Crawlers and first-time visitors |
+| `body.gl-playing` | The game, fullscreen, `overflow: hidden`, nothing else. | Everyone who taps Play, and every repeat visit |
+
+The second state is the product. The first is the only reason the page ranks.
+
+`GameLayout` hides `.game-seo-content` by default; `GameLanding` overrides it via
+`#gameLanding ~ .game-seo-content`. **Ship a page without a landing and its About / How to
+Play / Tips / FAQ / Games-Like block is `display: none` in every state a user can reach.**
+That is hidden text, and the `FAQPage` JSON-LD emitted alongside it then describes content
+nobody can see — which breaks the same visibility rule that makes fake `aggregateRating` a
+domain-wide risk.
+
+This is invisible when it happens: the page builds, renders and plays perfectly. All 23
+games shipped that way and averaged 52-58/100 on on-page SEO before anyone checked. Adding
+landings moved the catalogue to 77. `node scripts/landing-check.js` fails the build when a
+game page has no landing, so this cannot regress silently.
+
+Players do not pay for it: `gl_played_{gameId}` in localStorage removes the landing on
+load, so every visit after the first goes straight into the fullscreen game.
+
+**Do not restate the gameplay hide in a game's own CSS.** Rules like
+`.game-seo-content { display: none }` scoped to nothing, or `z-index: -1` to keep content
+off a transparent canvas, also fire while the landing is up and cancel it. Scope anything
+of that kind to `body.gl-playing`:
+
+```css
+/* WRONG — also hides the landing's content */
+.more-games, .game-seo-content { display: none !important; }
+
+/* RIGHT — only once the canvas is actually on screen */
+body.gl-playing .more-games,
+body.gl-playing .game-seo-content { display: none !important; }
+```
+
+Avoid `body:has(#someScreen:not([style*="none"]))` for this entirely — an element with no
+inline style trivially satisfies it, so the rule fires on a fresh page load.
 
 ### 2A.3 What NOT to include in Astro games
 
@@ -361,6 +459,16 @@ automatically included in the sitemap at build time.
 - [ ] Game data JSON at `apps/web-astro/src/data/games/GAME_SLUG.json`
 - [ ] Game page at `apps/web-astro/src/pages/games/GAME_SLUG.astro`
 - [ ] Uses `GameLayout` component (scripts/header/SEO handled by layout)
+- [ ] **`<Fragment slot="landing">` with `<GameLanding …>` present** — without it the page
+      has no indexable body (see 2A.2b). Verify: `node scripts/landing-check.js`
+- [ ] `GameLanding` is passed `accentColor`, not only `themeColor`
+- [ ] Page has exactly ONE `<h1>` — `GameHeader` already emits it, so in-game menu and
+      splash titles must be `<h2>` or a styled `div`
+- [ ] Any `.game-seo-content` / `.more-games` hide in game CSS is scoped to
+      `body.gl-playing` (unscoped rules cancel the landing)
+- [ ] NO `ratingValue` / `ratingCount` anywhere in the JSON
+- [ ] `title` 50-60 chars, `description` 150-160 chars
+- [ ] `tips`, `howToPlay`, `similarTo`, `aboutGame`, `faq` all populated (400+ words total)
 - [ ] `gameHeader.init()` called with title, icon, gameId, buttons, onSignIn/onSignOut
 - [ ] NO separate `gameCloud.initAuth()` call (header handles it)
 - [ ] NO custom header CSS (shared `game-header.js` injects its own)
