@@ -1,0 +1,23 @@
+{
+  "name": "content-studio",
+  "description": "Turns a browser game into engaging short-form and long-form video: game brief, shot planning, deterministic gameplay capture, TTS voiceover, burned-in captions, ffmpeg render, and a local approval gate before anything reaches Instagram or YouTube. Provides commands: /content-brief, /content-shoot, /content-review, /content-publish, /content-schedule",
+  "version": "0.1.0",
+  "author": {
+    "name": "Himanshu Singh",
+    "url": "https://github.com/HimanshuSingh2308"
+  },
+  "repository": "https://github.com/HimanshuSingh2308/claude-code-plugins",
+  "license": "MIT",
+  "keywords": [
+    "content-creation",
+    "video",
+    "social-media",
+    "instagram",
+    "youtube",
+    "ffmpeg",
+    "tts",
+    "captions",
+    "gameplay-capture",
+    "scheduling"
+  ]
+}

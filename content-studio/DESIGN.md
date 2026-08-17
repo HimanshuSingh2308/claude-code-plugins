@@ -3,8 +3,11 @@
 A Claude Code plugin that turns a Weekly Arcade game into engaging short-form and long-form
 video, on a schedule, with a human approval gate before anything goes live.
 
-Status: **design, not yet implemented.** Decisions below are settled; open items are listed at
-the end with the default I will assume unless told otherwise.
+Status: **Phase 1 render layer built and verified; capture blocked on machine load.** `lib/` is
+implemented and tested end to end (TTS, captions, render, take selection, review gate). What is
+not yet proven is one genuinely good Duneburst clip, because every capture on this machine has
+come back frame-starved. See "Corrections from implementation" for what the build changed about
+the plan.
 
 ## Decisions locked
 
@@ -118,11 +121,21 @@ overlay text, music track, platform targets.
 
 ### 4. Capture
 
-Runs `capture.js <config> --base https://weeklyarcade.games --seed N` at 1080x1920, several
-seeds per shot, and picks the take whose `[demo]` marks land closest to the planned beat sheet.
-Production URL by default so a scheduled run needs no dev server.
+Runs `capture.js <config> --seed N` against **`http://localhost:4321`**, several seeds per shot,
+and picks the take whose `[demo]` marks land closest to the planned beat sheet and whose frames
+actually arrived.
 
-Note: capture defaults to 720px wide, so the record width is overridden to 1080.
+**Localhost is mandatory, not a preference.** Production serves a minified `game.js`, and capture
+configs patch source by exact whitespace-sensitive string match, so against
+`https://weeklyarcade.games` all nine Duneburst patches miss and the capture films a default
+board while reporting success. A scheduled run therefore has to start the Astro dev server as a
+prerequisite. `capture.js` already defaults `--base` to localhost, so this is the harness's own
+assumption too.
+
+Every take is gated on unique frame count before anything is rendered on top of it. See risks.
+
+Note: capture defaults to 720px wide; the render upscales to 1080 rather than the capture, since
+a starved 1080 screencast is worse than a healthy 720 one.
 
 ### 5. Script, voice, render
 
@@ -135,10 +148,13 @@ each line's duration is measured from its own file, so caption timing is exact b
 and no forced alignment or whisper install is needed. Provider is env-selected
 (`CONTENT_TTS_PROVIDER=piper|elevenlabs`), Piper reading voices from `~/voices`.
 
-**5c.** Render. Remotion draws captions and overlays with real motion over the gameplay plate;
-ffmpeg does the concat, the music bed with game audio ducked under VO via `sidechaincompress`,
-and the platform-specific encodes. Masters render once at 1080x1920, then a 16:9 variant for
-long-form compilations.
+**5c.** Render. Captions and overlays are **ASS subtitles burned in by ffmpeg**, not Remotion:
+ASS supports the fades, punch-ins and colour accents the format needs, burns in one filter, and
+adds no npm install and no headless-browser pass to a scheduled job. Remotion stays available for
+overlays that genuinely need layout or data-driven motion, and nothing in the pipeline depends on
+it. ffmpeg also does the music bed with game audio ducked under VO via `sidechaincompress` keyed
+on the voice, a `loudnorm` master at -14 LUFS, and the platform encodes. 1080x1920 for reels and
+shorts; a 16:9 variant with a blurred self-background for long-form.
 
 **5d.** `premiere-export.mjs` also emits clips + an XMEML timeline with markers on every beat +
 an SRT, so any video can be opened in Premiere and hand-finished. Nothing in the automated path
@@ -191,6 +207,26 @@ favour templates and hooks that actually performed.
 - **IG has no undo.** Mitigated only by the review gate being explicit about it.
 - **Long-form needs a capture library first.** Compilations cannot exist before short-form has
   produced enough distinct clips.
+- **Frame starvation, now the live blocker.** A CDP screencast delivers frames only as fast as
+  the compositor produces them, and pads the file with duplicates when it cannot keep up - so
+  `ffprobe` still reports 24fps while the clip plays as a slideshow. Container-level checks cannot
+  see this. Mitigated by `validatePlate()`, which counts genuinely distinct frames via
+  `mpdecimate` and refuses anything under 12 unique fps. Observed on this machine: 22-30 unique
+  fps idle, **0.4-2 under a load average of ~64 on 12 cores**. A wall-clock-driven sim also slows
+  down under the same load, which stretched Duneburst's span beat from a tuned 2897ms to 28478ms.
+  The fix is machine state, not configuration, so a scheduled run must check load before shooting.
+
+## Corrections from implementation
+
+Things the build proved wrong about the plan above, recorded rather than quietly edited away:
+
+| Assumed | Actual |
+| --- | --- |
+| Captures can run against production | Production is minified; source patches can never match. Localhost is mandatory. |
+| Remotion draws the caption layer | ASS burned in by ffmpeg is enough and far cheaper to schedule. Remotion is now optional. |
+| A completed capture is a usable capture | Frame delivery is the dominant failure and is invisible to `ffprobe`. Needs an explicit gate. |
+| Screencast is silent, so audio must be added | The harness's Web Audio tap works; plates arrive **with** a game audio track. |
+| Caption timing is the hard part | It is free, given per-line WAVs. Frame health and beat timing are the hard parts. |
 
 ## Open items and assumed defaults
 
@@ -199,5 +235,6 @@ favour templates and hooks that actually performed.
 | Do the IG/YT channels exist? | Assumed not yet. Phase 2 needs them created plus API credentials before it can be built. |
 | "2 videos a day" | 2 short-form masters/day, each cut for both IG Reels and YT Shorts, plus 1 long-form compilation/week. |
 | Music | A small royalty-free library you drop in `content/music/`, sourced manually from the YouTube Audio Library. I will not auto-download tracks of unclear licence. |
-| Capture target | Production URL for scheduled runs, localhost while authoring configs. |
+| Capture target | Localhost always, including scheduled runs, since production is minified. A scheduled run starts the dev server itself. |
+| Machine load during a scheduled run | Checked before shooting and the run is skipped, not attempted, if the load average is above roughly 2x core count. A starved clip is worse than no clip. |
 | Pilot game | Duneburst, since it owns the only existing capture config. |
