@@ -58,6 +58,36 @@ Orphaned Chrome from a failed run blocks later ones: `cdp.js` derives its debug
 port from `process.uptime()`, which is near-zero at launch, so nearly every run
 tries port 9333. Clear them with `pkill -f "demo-capture-"`.
 
+### The gate does not apply to synthetic renders
+
+The 12-unique-fps floor diagnoses *captured* footage, where duplicate frames mean
+frames that were dropped. A drawn render has no capture step, so duplicates there
+mean something else entirely: nothing on screen is moving. Do not "fix" a
+synthetic render by relaxing the gate - read it as a report on how much of the
+cut is frozen, and animate the dead time instead.
+
+The launch video measured 247 unique frames in 630 (11.8 unique fps). Reading it
+as a starvation failure would have been wrong; read as a report on frozen time it
+found a real one - 24 cards at 0.042s stagger all landed 1.6s into a 6.2s scene,
+leaving 4.5s of dead frame. Pacing the stagger to 0.11s so the cascade fills most
+of its scene took the count to 296 (14.1 unique fps).
+
+**Do not expect to reach the frame count, and do not try to buy it with a drifting
+backdrop.** Replacing the `round()`ed crop of the padded backdrop with a float
+affine transform moved the count by almost nothing, and measuring the frame
+sequence directly showed why: at radius-190 blur the local gradient is so shallow
+that a 0.07px/frame shift changes every pixel by under 1/255 and rounds away.
+7.9s of the cut is still bit-for-bit frozen. A drift that cannot change a pixel
+cannot be seen by a viewer either, so it buys nothing on the look and nothing on
+the metric. Perceptible slow motion needs high-frequency detail to move, not a
+soft gradient.
+
+What the count is good for is spotting holds that are too long. A typographic cut
+that pauses long enough to be read *should* score low: 14 unique fps on drawn
+motion graphics is healthy, while the same number on a capture means half the
+frames were dropped. Judge the holds themselves - 2 to 3s on a card is normal,
+4.5s was not.
+
 ## Take selection
 
 `shoot.mjs` shoots several seeds and scores each on unique fps first, then on how
