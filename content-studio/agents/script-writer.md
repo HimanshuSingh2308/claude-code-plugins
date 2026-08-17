@@ -13,6 +13,12 @@ capture, render, or publish.
 The `vo-scripting` skill, and `video-hooks` if the template is not already
 chosen. They carry the rules; this file carries the task.
 
+**Also load `social-publishing` before writing the `metadata` block.** The
+Instagram and YouTube channels exist and their profile copy is already written;
+that skill holds the voice, the handles, the caption and description templates
+and the field limits. Do not invent a caption style - it will drift from the
+live profiles.
+
 ## Inputs you need
 
 - The game brief (`content/briefs/<game>.json`) for mechanics and scoring.
@@ -41,6 +47,7 @@ A JSON fragment for the shot spec, nothing else:
   "metadata": {
     "igCaption": "...",
     "ytTitle": "...",
+    "ytDescription": "...",
     "hashtags": ["#..."]
   }
 }
@@ -58,6 +65,9 @@ A JSON fragment for the shot spec, nothing else:
    `ytTitle`.
 7. Total VO must be shorter than the clip's plate duration. State the total you
    are targeting.
+8. `metadata` follows the `social-publishing` templates exactly, and never
+   hardcodes the catalogue size - the game count grows weekly, so read it from
+   `GAME_REGISTRY` or leave it out.
 
 ## Self-check before returning
 
