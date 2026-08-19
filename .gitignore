@@ -7,3 +7,8 @@ __pycache__/
 
 # Local render output - never part of the plugin
 content-studio/out/
+
+# Machine-generated code knowledge graph (project-manager /kg-update).
+# Regenerated per clone and goes stale fast, so it is not shipped to
+# anyone installing this marketplace.
+.claude/knowledge_graph.json
