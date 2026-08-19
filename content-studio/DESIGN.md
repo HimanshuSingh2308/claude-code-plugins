@@ -3,8 +3,11 @@
 A Claude Code plugin that turns a Weekly Arcade game into engaging short-form and long-form
 video, on a schedule, with a human approval gate before anything goes live.
 
-Status: **design, not yet implemented.** Decisions below are settled; open items are listed at
-the end with the default I will assume unless told otherwise.
+Status: **Phase 1 render layer built and verified; capture blocked on machine load.** `lib/` is
+implemented and tested end to end (TTS, captions, render, take selection, review gate). What is
+not yet proven is one genuinely good Duneburst clip, because every capture on this machine has
+come back frame-starved. See "Corrections from implementation" for what the build changed about
+the plan.
 
 ## Decisions locked
 
@@ -15,6 +18,8 @@ the end with the default I will assume unless told otherwise.
 | Voice | TTS voiceover + burned-in captions | Scripted as reaction/commentary, not feature copy. |
 | TTS | Piper now, ElevenLabs later behind one interface | Nothing blocked on billing. Mirrors muse-studio's provider split. |
 | YouTube | Shorts (9:16) + long-form (16:9) | Long-form starts as compilations of existing short captures. |
+| YouTube upload | Bundle for manual Studio upload, no API | An API upload from an un-audited project is locked `private` *permanently* - the owner cannot unlock it. |
+| Brand voice | One `social-publishing` skill, not per-agent prose | The live profile copy is the source of truth; duplicating it in agents guarantees drift. |
 | Code layout | Engine in plugin, per-game data in weekly-arcade | Game-specific source patches must sit next to the source they patch. |
 | Schedule | Claude Code scheduled agent + local review page | Shot selection and scripting need the model, not a bare cron script. |
 
@@ -40,12 +45,15 @@ hplugins/content-studio/            # the engine, portable
 │   ├── vo-scripting/               # commentary voice, anti-ad rules
 │   ├── caption-style/              # overlay timing, safe areas per platform
 │   ├── render-pipeline/            # ffmpeg + Remotion recipes
-│   └── social-publishing/          # IG + YT API contracts and constraints
+│   ├── thumbnail-design/           # BUILT - CTR rules, 3-variant test discipline
+│   └── social-publishing/          # BUILT - brand voice, handles, per-field templates
 └── lib/                            # node scripts, zero-to-few deps
     ├── render.mjs                  # master render, ffmpeg orchestration
     ├── tts.mjs                     # piper | elevenlabs, per-line WAVs
     ├── remotion/                   # caption + overlay compositions
-    ├── publish-youtube.mjs
+    ├── sfx.py                      # BUILT - synthesised cue bed from a cue list
+    ├── thumbnail.py                # BUILT - 3 thumbnail variants + Reels cover
+    ├── bundle-youtube.mjs          # writes the manual-upload bundle, does NOT upload
     ├── publish-instagram.mjs
     └── premiere-export.mjs         # XMEML timeline + SRT + clips
 
@@ -118,11 +126,21 @@ overlay text, music track, platform targets.
 
 ### 4. Capture
 
-Runs `capture.js <config> --base https://weeklyarcade.games --seed N` at 1080x1920, several
-seeds per shot, and picks the take whose `[demo]` marks land closest to the planned beat sheet.
-Production URL by default so a scheduled run needs no dev server.
+Runs `capture.js <config> --seed N` against **`http://localhost:4321`**, several seeds per shot,
+and picks the take whose `[demo]` marks land closest to the planned beat sheet and whose frames
+actually arrived.
 
-Note: capture defaults to 720px wide, so the record width is overridden to 1080.
+**Localhost is mandatory, not a preference.** Production serves a minified `game.js`, and capture
+configs patch source by exact whitespace-sensitive string match, so against
+`https://weeklyarcade.games` all nine Duneburst patches miss and the capture films a default
+board while reporting success. A scheduled run therefore has to start the Astro dev server as a
+prerequisite. `capture.js` already defaults `--base` to localhost, so this is the harness's own
+assumption too.
+
+Every take is gated on unique frame count before anything is rendered on top of it. See risks.
+
+Note: capture defaults to 720px wide; the render upscales to 1080 rather than the capture, since
+a starved 1080 screencast is worse than a healthy 720 one.
 
 ### 5. Script, voice, render
 
@@ -135,10 +153,13 @@ each line's duration is measured from its own file, so caption timing is exact b
 and no forced alignment or whisper install is needed. Provider is env-selected
 (`CONTENT_TTS_PROVIDER=piper|elevenlabs`), Piper reading voices from `~/voices`.
 
-**5c.** Render. Remotion draws captions and overlays with real motion over the gameplay plate;
-ffmpeg does the concat, the music bed with game audio ducked under VO via `sidechaincompress`,
-and the platform-specific encodes. Masters render once at 1080x1920, then a 16:9 variant for
-long-form compilations.
+**5c.** Render. Captions and overlays are **ASS subtitles burned in by ffmpeg**, not Remotion:
+ASS supports the fades, punch-ins and colour accents the format needs, burns in one filter, and
+adds no npm install and no headless-browser pass to a scheduled job. Remotion stays available for
+overlays that genuinely need layout or data-driven motion, and nothing in the pipeline depends on
+it. ffmpeg also does the music bed with game audio ducked under VO via `sidechaincompress` keyed
+on the voice, a `loudnorm` master at -14 LUFS, and the platform encodes. 1080x1920 for reels and
+shorts; a 16:9 variant with a blurred self-background for long-form.
 
 **5d.** `premiere-export.mjs` also emits clips + an XMEML timeline with markers on every beat +
 an SRT, so any video can be opened in Premiere and hand-finished. Nothing in the automated path
@@ -156,9 +177,13 @@ VO transcript, and approve/reject. Approval writes to the shot record; nothing p
 
 ### 8. Publish
 
-**YouTube** is a true draft. Uploads from an unverified API project are forced to `private`,
-which is exactly the state wanted, and you publish from Studio. Since Dec 2025 `videos.insert`
-costs ~100 units against a separate 100-uploads/day bucket, so 2/day is not close to any limit.
+**YouTube** is not published through the API at all. Uploads via `videos.insert` from an
+un-audited API project are forced to `private` and **the owner cannot change the visibility** -
+not from Studio, not by any call. The video is stranded. The only exits are passing a YouTube
+compliance audit or re-uploading by hand, so `/content-publish` writes an **upload bundle** (mp4,
+thumbnail, and a text file with title, description and tags) that a human drags into Studio.
+Studio's native scheduler is better than the API's anyway, and the quota question (~100 units per
+`videos.insert` against a separate 100-uploads/day bucket) never arises.
 
 **Instagram** has no draft state. Publishing is `POST /media` (container, needs a public
 `video_url`, so the mp4 is uploaded to Firebase Storage first) then `POST /media_publish`.
@@ -177,7 +202,8 @@ favour templates and hooks that actually performed.
 1. **Phase 1 - one game, one format, manual.** Duneburst reel end to end: brief, shot plan,
    capture, Piper VO, captions, render, review page. No publishing, no schedule. This is the
    phase that proves whether the output is actually good.
-2. **Phase 2 - publish.** YT private upload, then IG container/publish with Firebase hosting.
+2. **Phase 2 - publish.** YT upload bundle for manual Studio upload, then IG container/publish
+   with Firebase hosting.
 3. **Phase 3 - scale the catalogue.** `capture-config-author` against 4-5 more games, which is
    what makes daily volume possible at all.
 4. **Phase 4 - schedule + long-form.** Cron routine, compilations, feedback loop.
@@ -191,6 +217,27 @@ favour templates and hooks that actually performed.
 - **IG has no undo.** Mitigated only by the review gate being explicit about it.
 - **Long-form needs a capture library first.** Compilations cannot exist before short-form has
   produced enough distinct clips.
+- **Frame starvation, now the live blocker.** A CDP screencast delivers frames only as fast as
+  the compositor produces them, and pads the file with duplicates when it cannot keep up - so
+  `ffprobe` still reports 24fps while the clip plays as a slideshow. Container-level checks cannot
+  see this. Mitigated by `validatePlate()`, which counts genuinely distinct frames via
+  `mpdecimate` and refuses anything under 12 unique fps. Observed on this machine: 22-30 unique
+  fps idle, **0.4-2 under a load average of ~64 on 12 cores**. A wall-clock-driven sim also slows
+  down under the same load, which stretched Duneburst's span beat from a tuned 2897ms to 28478ms.
+  The fix is machine state, not configuration, so a scheduled run must check load before shooting.
+
+## Corrections from implementation
+
+Things the build proved wrong about the plan above, recorded rather than quietly edited away:
+
+| Assumed | Actual |
+| --- | --- |
+| Captures can run against production | Production is minified; source patches can never match. Localhost is mandatory. |
+| Remotion draws the caption layer | ASS burned in by ffmpeg is enough and far cheaper to schedule. Remotion is now optional. |
+| A completed capture is a usable capture | Frame delivery is the dominant failure and is invisible to `ffprobe`. Needs an explicit gate. |
+| Screencast is silent, so audio must be added | The harness's Web Audio tap works; plates arrive **with** a game audio track. |
+| Caption timing is the hard part | It is free, given per-line WAVs. Frame health and beat timing are the hard parts. |
+| A forced-`private` YouTube upload is a usable draft | It is a dead end. The owner cannot change the visibility of a video uploaded from an un-audited project, so the API cannot be used to publish at all. Metadata is generated as text a human pastes into Studio. |
 
 ## Open items and assumed defaults
 
@@ -199,5 +246,6 @@ favour templates and hooks that actually performed.
 | Do the IG/YT channels exist? | Assumed not yet. Phase 2 needs them created plus API credentials before it can be built. |
 | "2 videos a day" | 2 short-form masters/day, each cut for both IG Reels and YT Shorts, plus 1 long-form compilation/week. |
 | Music | A small royalty-free library you drop in `content/music/`, sourced manually from the YouTube Audio Library. I will not auto-download tracks of unclear licence. |
-| Capture target | Production URL for scheduled runs, localhost while authoring configs. |
+| Capture target | Localhost always, including scheduled runs, since production is minified. A scheduled run starts the dev server itself. |
+| Machine load during a scheduled run | Checked before shooting and the run is skipped, not attempted, if the load average is above roughly 2x core count. A starved clip is worse than no clip. |
 | Pilot game | Duneburst, since it owns the only existing capture config. |
