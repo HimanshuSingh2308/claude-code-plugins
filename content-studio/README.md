@@ -67,6 +67,12 @@ node lib/shoot.mjs shot.json --repo ~/Documents/weekly-arcade --out content/out/
 node lib/review.mjs content/out 4399
 ```
 
+Three thumbnail variants plus the contact sheet to judge them at feed size:
+
+```
+python3 lib/thumbnail.py spec.json out/thumbs
+```
+
 ## Two things worth knowing before using it
 
 **Captures must run against localhost.** Production serves a minified `game.js`

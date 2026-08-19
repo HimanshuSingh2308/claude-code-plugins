@@ -1,0 +1,9 @@
+# Python bytecode from the content-studio lib scripts
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# Local render output - never part of the plugin
+content-studio/out/

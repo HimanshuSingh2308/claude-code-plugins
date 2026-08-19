@@ -45,11 +45,14 @@ hplugins/content-studio/            # the engine, portable
 │   ├── vo-scripting/               # commentary voice, anti-ad rules
 │   ├── caption-style/              # overlay timing, safe areas per platform
 │   ├── render-pipeline/            # ffmpeg + Remotion recipes
+│   ├── thumbnail-design/           # BUILT - CTR rules, 3-variant test discipline
 │   └── social-publishing/          # BUILT - brand voice, handles, per-field templates
 └── lib/                            # node scripts, zero-to-few deps
     ├── render.mjs                  # master render, ffmpeg orchestration
     ├── tts.mjs                     # piper | elevenlabs, per-line WAVs
     ├── remotion/                   # caption + overlay compositions
+    ├── sfx.py                      # BUILT - synthesised cue bed from a cue list
+    ├── thumbnail.py                # BUILT - 3 thumbnail variants + Reels cover
     ├── bundle-youtube.mjs          # writes the manual-upload bundle, does NOT upload
     ├── publish-instagram.mjs
     └── premiere-export.mjs         # XMEML timeline + SRT + clips
