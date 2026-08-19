@@ -16,6 +16,8 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { FONT_DIR } from './captions.mjs';
+
 const FFMPEG = process.env.CONTENT_FFMPEG || 'ffmpeg';
 const FFPROBE = process.env.CONTENT_FFPROBE || 'ffprobe';
 
@@ -110,7 +112,12 @@ function videoFit(preset, plate) {
 function buildFilter({ preset, plate, vo, musicIndex, hasGameAudio, assPath, offsetMs, targetMs }) {
   const parts = [];
   const fit = videoFit(preset, plate);
-  const ass = assPath ? `,subtitles='${assPath.replace(/'/g, "\\'")}'` : '';
+  /* fontsdir, not just the .ass file: libass falls back to a system font silently
+     when it cannot resolve Fontname, and a silent fallback to Helvetica is how a
+     render ends up off-brand with no error anywhere in the log. */
+  const ass = assPath
+    ? `,subtitles='${assPath.replace(/'/g, "\\'")}':fontsdir='${FONT_DIR.replace(/'/g, "\\'")}'`
+    : '';
   parts.push(`[0:v]fps=${preset.fps},${fit},format=yuv420p${ass}[v]`);
 
   const voLabels = [];

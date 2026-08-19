@@ -37,6 +37,15 @@ implementation proved wrong about the original plan.
 | `/content-publish` | Publish approved shots (Phase 2) |
 | `/content-schedule` | Install the recurring routine (Phase 4) |
 
+## Skills
+
+| Skill | Holds |
+| --- | --- |
+| `video-hooks` | Retention patterns and the hook taxonomy |
+| `vo-scripting` | Commentary voice, the anti-advertising rules |
+| `render-pipeline` | ffmpeg recipes and the frame-health gate |
+| `social-publishing` | Brand voice, the live handles, caption/title/description templates, field limits |
+
 ## lib/
 
 Every script runs standalone, so any stage can be debugged without the others.
@@ -56,6 +65,12 @@ node lib/shoot.mjs shot.json --repo ~/Documents/weekly-arcade --out content/out/
 
 # approval gate, 127.0.0.1 only
 node lib/review.mjs content/out 4399
+```
+
+Three thumbnail variants plus the contact sheet to judge them at feed size:
+
+```
+python3 lib/thumbnail.py spec.json out/thumbs
 ```
 
 ## Two things worth knowing before using it
@@ -89,8 +104,15 @@ helpers.
 `/content-review` records intent; `/content-publish` acts on it. They are separate
 commands because the platforms are not symmetrical:
 
-- **YouTube** uploads from an unverified API project are forced to `private`,
-  which is a real draft. Reversible, published from Studio.
+- **YouTube** is not published by this plugin at all. Uploads via
+  `videos.insert` from an un-audited API project are locked `private` and **the
+  owner cannot change the visibility** - not from Studio, not at all. So
+  `/content-publish` writes an upload bundle (mp4, thumbnail, title,
+  description, tags) and a human drags it into Studio, whose native scheduler
+  beats the API's anyway.
 - **Instagram** has no draft or scheduling endpoint. Publishing is
   `POST /media` then `POST /media_publish`, it is immediate, and it **cannot be
   undone**.
+
+Brand voice, handles and the per-field templates live in the
+`social-publishing` skill.

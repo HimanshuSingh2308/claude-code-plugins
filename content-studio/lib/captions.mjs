@@ -25,7 +25,15 @@ export const SAFE_AREAS = {
   long: { w: 1920, h: 1080, marginV: 120, marginH: 120 },
 };
 
-const FONT = process.env.CONTENT_CAPTION_FONT || 'Arial Black';
+/* The channel display face, vendored at assets/fonts. Arial Black was the old
+   default and it is the single most recognisable "made in a hurry" signal a video
+   can carry - libass will happily find it on any Mac, which is exactly the
+   problem. libass resolves this name from FONT_DIR, which render.mjs passes to the
+   subtitles filter as fontsdir, so the caption face does not depend on what
+   happens to be installed. */
+const FONT = process.env.CONTENT_CAPTION_FONT || 'Anton';
+export const FONT_DIR = process.env.CONTENT_FONT_DIR
+  || path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'assets', 'fonts');
 
 function assHeader({ w, h, marginV, marginH }) {
   // &H00BBGGRR. Outline 6 plus a shadow keeps text legible over a bright,

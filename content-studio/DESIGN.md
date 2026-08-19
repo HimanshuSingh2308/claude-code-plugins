@@ -18,6 +18,8 @@ the plan.
 | Voice | TTS voiceover + burned-in captions | Scripted as reaction/commentary, not feature copy. |
 | TTS | Piper now, ElevenLabs later behind one interface | Nothing blocked on billing. Mirrors muse-studio's provider split. |
 | YouTube | Shorts (9:16) + long-form (16:9) | Long-form starts as compilations of existing short captures. |
+| YouTube upload | Bundle for manual Studio upload, no API | An API upload from an un-audited project is locked `private` *permanently* - the owner cannot unlock it. |
+| Brand voice | One `social-publishing` skill, not per-agent prose | The live profile copy is the source of truth; duplicating it in agents guarantees drift. |
 | Code layout | Engine in plugin, per-game data in weekly-arcade | Game-specific source patches must sit next to the source they patch. |
 | Schedule | Claude Code scheduled agent + local review page | Shot selection and scripting need the model, not a bare cron script. |
 
@@ -43,12 +45,15 @@ hplugins/content-studio/            # the engine, portable
 │   ├── vo-scripting/               # commentary voice, anti-ad rules
 │   ├── caption-style/              # overlay timing, safe areas per platform
 │   ├── render-pipeline/            # ffmpeg + Remotion recipes
-│   └── social-publishing/          # IG + YT API contracts and constraints
+│   ├── thumbnail-design/           # BUILT - CTR rules, 3-variant test discipline
+│   └── social-publishing/          # BUILT - brand voice, handles, per-field templates
 └── lib/                            # node scripts, zero-to-few deps
     ├── render.mjs                  # master render, ffmpeg orchestration
     ├── tts.mjs                     # piper | elevenlabs, per-line WAVs
     ├── remotion/                   # caption + overlay compositions
-    ├── publish-youtube.mjs
+    ├── sfx.py                      # BUILT - synthesised cue bed from a cue list
+    ├── thumbnail.py                # BUILT - 3 thumbnail variants + Reels cover
+    ├── bundle-youtube.mjs          # writes the manual-upload bundle, does NOT upload
     ├── publish-instagram.mjs
     └── premiere-export.mjs         # XMEML timeline + SRT + clips
 
@@ -172,9 +177,13 @@ VO transcript, and approve/reject. Approval writes to the shot record; nothing p
 
 ### 8. Publish
 
-**YouTube** is a true draft. Uploads from an unverified API project are forced to `private`,
-which is exactly the state wanted, and you publish from Studio. Since Dec 2025 `videos.insert`
-costs ~100 units against a separate 100-uploads/day bucket, so 2/day is not close to any limit.
+**YouTube** is not published through the API at all. Uploads via `videos.insert` from an
+un-audited API project are forced to `private` and **the owner cannot change the visibility** -
+not from Studio, not by any call. The video is stranded. The only exits are passing a YouTube
+compliance audit or re-uploading by hand, so `/content-publish` writes an **upload bundle** (mp4,
+thumbnail, and a text file with title, description and tags) that a human drags into Studio.
+Studio's native scheduler is better than the API's anyway, and the quota question (~100 units per
+`videos.insert` against a separate 100-uploads/day bucket) never arises.
 
 **Instagram** has no draft state. Publishing is `POST /media` (container, needs a public
 `video_url`, so the mp4 is uploaded to Firebase Storage first) then `POST /media_publish`.
@@ -193,7 +202,8 @@ favour templates and hooks that actually performed.
 1. **Phase 1 - one game, one format, manual.** Duneburst reel end to end: brief, shot plan,
    capture, Piper VO, captions, render, review page. No publishing, no schedule. This is the
    phase that proves whether the output is actually good.
-2. **Phase 2 - publish.** YT private upload, then IG container/publish with Firebase hosting.
+2. **Phase 2 - publish.** YT upload bundle for manual Studio upload, then IG container/publish
+   with Firebase hosting.
 3. **Phase 3 - scale the catalogue.** `capture-config-author` against 4-5 more games, which is
    what makes daily volume possible at all.
 4. **Phase 4 - schedule + long-form.** Cron routine, compilations, feedback loop.
@@ -227,6 +237,7 @@ Things the build proved wrong about the plan above, recorded rather than quietly
 | A completed capture is a usable capture | Frame delivery is the dominant failure and is invisible to `ffprobe`. Needs an explicit gate. |
 | Screencast is silent, so audio must be added | The harness's Web Audio tap works; plates arrive **with** a game audio track. |
 | Caption timing is the hard part | It is free, given per-line WAVs. Frame health and beat timing are the hard parts. |
+| A forced-`private` YouTube upload is a usable draft | It is a dead end. The owner cannot change the visibility of a video uploaded from an un-audited project, so the API cannot be used to publish at all. Metadata is generated as text a human pastes into Studio. |
 
 ## Open items and assumed defaults
 

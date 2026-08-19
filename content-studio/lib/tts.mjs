@@ -7,9 +7,16 @@
    and no whisper install is needed anywhere downstream.
 
    Provider is env-selected so nothing here is blocked on a paid account:
-     CONTENT_TTS_PROVIDER=piper|elevenlabs   (default piper)
+     CONTENT_TTS_PROVIDER=kokoro|piper|elevenlabs   (default kokoro)
    Piper reads voices from CONTENT_PIPER_VOICE_DIR (default ~/voices), mirroring
-   the provider split muse-studio already uses. */
+   the provider split muse-studio already uses.
+
+   KOKORO IS THE CHANNEL VOICE and it is the default. It is not a drop-in sibling
+   of the other two: it batches. Kokoro loads a 350MB model, so spawning it per
+   line would spend more time loading weights than speaking, and lib/vo-kokoro.py
+   therefore synthesises every line in one process before the measuring loop runs.
+   Timing stays here either way - vo-kokoro.py is told nothing about pins, and this
+   file keeps doing the cursor-and-atMs arithmetic over whatever WAVs came back. */
 
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -19,6 +26,15 @@ import path from 'node:path';
 const PIPER_BIN = process.env.CONTENT_PIPER_BIN || 'piper';
 const VOICE_DIR = process.env.CONTENT_PIPER_VOICE_DIR || path.join(homedir(), 'voices');
 const DEFAULT_VOICE = process.env.CONTENT_PIPER_VOICE || 'en_US-ryan-high';
+
+/* The channel voice, and the paths its model and venv live at. Both are outside
+   any repo and outside the plugin: the model is 350MB and has to survive plugin
+   reinstalls, and a venv committed to a marketplace is a broken venv on every
+   other machine. See the setup notes at the top of lib/vo-kokoro.py. */
+const KOKORO_VOICE = process.env.CONTENT_KOKORO_VOICE || 'af_heart';
+const KOKORO_PY = process.env.CONTENT_KOKORO_PYTHON
+  || path.join(homedir(), '.local/share/content-studio/ttsenv/bin/python3');
+const KOKORO_SCRIPT = path.join(path.dirname(new URL(import.meta.url).pathname), 'vo-kokoro.py');
 
 /* An absolute .onnx path overrides the voice-dir lookup, so a voice living
    outside the library is still usable without moving files around. */
@@ -105,15 +121,53 @@ function wrapPcmAsWav(pcm, sampleRate, channels) {
   return Buffer.concat([head, pcm]);
 }
 
-/* lines: [{ text, atMs? }]. A line with `atMs` is pinned to that timestamp
+/* One process for the whole script: writes vo-NN.wav for every item, already
+   EQ'd, compressed, de-essed and loudness-matched, because the delivery shaping
+   and the mastering are what make this voice the channel's voice rather than a
+   generic sample of it. `index` is passed explicitly so the filenames match the
+   indices this file hands out, which are the line's position in the ORIGINAL
+   script - blank lines are skipped here and must not shift the numbering. */
+async function synthKokoro(items, outDir, voice) {
+  const listFile = path.join(outDir, '.kokoro-lines.json');
+  writeFileSync(listFile, `${JSON.stringify(items, null, 2)}\n`);
+  await new Promise((resolve, reject) => {
+    const proc = spawn(KOKORO_PY,
+      [KOKORO_SCRIPT, '--lines', listFile, '--out', outDir, '--voice', voice],
+      { stdio: ['ignore', 'inherit', 'pipe'] });
+    let err = '';
+    proc.stderr.on('data', (d) => { err += d.toString(); });
+    proc.on('error', (e) => reject(new Error(
+      `kokoro failed to start (${KOKORO_PY}): ${e.message}\n`
+      + 'Set CONTENT_KOKORO_PYTHON, or see the setup notes in lib/vo-kokoro.py.')));
+    proc.on('close', (code) => (code === 0 ? resolve()
+      : reject(new Error(`vo-kokoro.py exited ${code}\n${err.trim()}`))));
+  });
+}
+
+/* lines: [{ text, atMs?, role? }]. `role` picks the delivery shape (hook, jab,
+   warm, staccato, cta, neutral) and is honoured by the kokoro provider only - the
+   other two have no rate or pitch control worth the name, which is most of why
+   they are no longer the default. A line with `atMs` is pinned to that timestamp
    because it has to land on a specific gameplay beat; a line without one falls
    in right after its predecessor plus `gapMs`. Pinning is how VO stays synced to
    the capture's beat sheet instead of drifting a little further out on every
    line, and a pin that would land before the previous line has finished is
    pushed rather than allowed to overlap. */
-export async function synthesize({ lines, outDir, voice = DEFAULT_VOICE, provider, gapMs = 220 }) {
-  const prov = provider || process.env.CONTENT_TTS_PROVIDER || 'piper';
+export async function synthesize({ lines, outDir, voice, provider, gapMs = 220 }) {
+  const prov = provider || process.env.CONTENT_TTS_PROVIDER || 'kokoro';
+  const vox = voice || (prov === 'kokoro' ? KOKORO_VOICE : DEFAULT_VOICE);
   mkdirSync(outDir, { recursive: true });
+
+  /* Batch first, measure second. Every provider ends up at the same place: one
+     WAV per line on disk, named by its index in the original script. */
+  if (prov === 'kokoro') {
+    const items = [];
+    lines.forEach((line, i) => {
+      const text = (typeof line === 'string' ? line : line.text || '').trim();
+      if (text) items.push({ index: i, text: text.replace(/\*/g, ''), role: line.role });
+    });
+    if (items.length) await synthKokoro(items, outDir, vox);
+  }
 
   const out = [];
   let cursor = 0;
@@ -128,8 +182,9 @@ export async function synthesize({ lines, outDir, voice = DEFAULT_VOICE, provide
        synthesizer either spells them out or inserts a pause, which throws off
        the one duration the caption timing depends on. */
     const spoken = text.replace(/\*/g, '');
-    if (prov === 'elevenlabs') await synthElevenLabs(spoken, voice, wav);
-    else await runPiper(spoken, voice, wav);
+    if (prov === 'kokoro') { /* already written by synthKokoro */ }
+    else if (prov === 'elevenlabs') await synthElevenLabs(spoken, vox, wav);
+    else await runPiper(spoken, vox, wav);
 
     const durationMs = wavDurationMs(wav);
     const wanted = typeof line.atMs === 'number' ? line.atMs : cursor;
@@ -141,7 +196,7 @@ export async function synthesize({ lines, outDir, voice = DEFAULT_VOICE, provide
 
   return {
     provider: prov,
-    voice,
+    voice: vox,
     gapMs,
     lines: out,
     totalMs: out.length ? out[out.length - 1].endMs : 0,

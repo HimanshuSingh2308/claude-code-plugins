@@ -1,7 +1,7 @@
 {
   "name": "content-studio",
-  "description": "Turns a browser game into engaging short-form and long-form video: game brief, shot planning, deterministic gameplay capture, TTS voiceover, burned-in captions, ffmpeg render, and a local approval gate before anything reaches Instagram or YouTube. Provides commands: /content-brief, /content-shoot, /content-review, /content-publish, /content-schedule",
-  "version": "0.1.0",
+  "description": "Turns a browser game into engaging short-form and long-form video: game brief, shot planning, deterministic gameplay capture, Kokoro TTS voiceover, SFX bed, burned-in captions, ffmpeg render, thumbnails and Reels covers, and a local approval gate before anything reaches Instagram or YouTube. Provides commands: /content-brief, /content-shoot, /content-review",
+  "version": "0.2.0",
   "author": {
     "name": "Himanshu Singh",
     "url": "https://github.com/HimanshuSingh2308"
@@ -17,7 +17,8 @@
     "ffmpeg",
     "tts",
     "captions",
-    "gameplay-capture",
-    "scheduling"
+    "sfx",
+    "thumbnails",
+    "gameplay-capture"
   ]
 }
