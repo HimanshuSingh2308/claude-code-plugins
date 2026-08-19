@@ -1,6 +1,6 @@
 ---
 name: thumbnail-design
-description: How this channel's thumbnails and Reels covers are made - the measured CTR rules, the three-variant test discipline, and lib/thumbnail.py. Load before making any thumbnail, cover or upload bundle.
+description: How this channel's thumbnails and Reels covers are made - the locked sticker-fan design language, the measured CTR rules, the three-variant test discipline, and the three renderers. Load before making any thumbnail, cover or upload bundle.
 ---
 
 # thumbnail-design
@@ -46,12 +46,106 @@ Aggregate 2024-2026 studies (1of10, ThumbnailTest, Statista) are consistent:
 - **One subject, one message, one second.** Clutter fails because the viewer never
   processes it - the 2026 trend is aggressive simplicity.
 
-## Two renderers, one set of rules
+## The house language is STICKER FAN, and it is not up for redesign
+
+**This is the locked design language for every thumbnail and cover on this channel
+as of 2026-08-19.** It was approved on output, not on description, and it replaced
+a clean centred grid. Use it unless there is a stated reason not to, and if there
+is, say what the reason is rather than quietly drawing something else.
 
 ```
-python3 "$CLAUDE_PLUGIN_ROOT/lib/thumbnail_web.py" spec.json outdir   # default
+python3 "$CLAUDE_PLUGIN_ROOT/lib/sticker_fan.py" spec.json outdir
+```
+
+`lib/sticker_fan.py` is the language as a callable, and it carries the geometry in
+**fractions of the frame** rather than pixels, so the same numbers render 1280x720
+and 1080x1920 and would render 4K. Its docstring is the long form; this is the
+contract.
+
+**Why it looks like this: the audience is 18-35 and mostly gamers.** A tidy,
+symmetrical, well-kerned thumbnail is the right answer for a B2B webinar card and
+the wrong answer for a game platform - it reads as something a marketing
+department made rather than something a player made. Every element below is a
+deliberate loudness, and every one of them was kept because it survives 210px, not
+because it looks good at 1280.
+
+Painted in this order, and the order is load-bearing:
+
+| # | Element | The rule |
+|---|---|---|
+| 1 | Backdrop | the channel ground - navy to plum, one warm glow. **Never a video frame.** |
+| 2 | Burst | wide teal wedges from behind the fan, alpha 17, blurred 11px at 1280 |
+| 3 | Vignette | corners sunk so the fan sits in a pool of light |
+| 4 | Cards | **exactly three**, tilted, real gameplay art, thick white stroke OUTSIDE, cast shadow |
+| 5 | Rank discs | amber fill, navy numeral, on each card's outer corner, **numeral only, upright** |
+| 6 | Lockup | mark plus wordmark, one optical centre line. Dropped on covers. |
+| 7 | Headline | heavy display face, **hard-offset PINK copy** behind it - not an outline, not a blur |
+| 8 | Proof line | amber, small, tracked, optional |
+
+**Three cards. Not eight, not ten, not the catalogue.** The obvious way to say "ten
+games" is to show ten, and it is wrong at the size the image is served: ten tiles
+across 1280px is ten 232px stamps, and at the ~210px a sidebar actually serves that
+is ten 38px stamps - a texture, not ten games. The count goes in the WORDS, where a
+numeral is legible at any size. Three cards plus discs numbered 1, 2 and 3 imply the
+rest, because a countdown whose lowest visible number is 3 says there are higher
+ones. `CARDS = 3` and `render()` exits on a longer cast.
+
+**What is constant and what a variant may change.** The tilt, the stroke, the
+shadow, the discs, the burst, the vignette and the pink offset are **layout
+constants and must be identical across a variant set**. A variant may change only
+the words, and whether the hero carries the amber ring. A three-variant test whose
+arms also differ in treatment cannot say which difference moved the number - and
+this is the specific reason the rank discs are on ALL three variants and are no
+longer an axis: with ten tiles they were decoration, but with three cards they are
+what makes the picture read as a ranked countdown at all, so dropping them from one
+arm would have made that arm differ on two things.
+
+**Which game goes on which side is a legibility constraint, not podium order.** The
+hero overlaps the inner half of each flanker, so a flanker only ever shows its
+**outer** half. Put the game whose art lives on its right on the right. Getting this
+backwards costs a whole render: a game with a text HUD down its left third, placed
+left, shows nothing but small type. The disc corner is a per-card `'tl'|'tr'` for the
+same reason - every disc top-left puts the right-hand flanker's numeral underneath
+the hero.
+
+Three things in the implementation are not style and will bite if reimplemented:
+
+- **The tilt is supersampled.** A card rotated at final size shows a jagged stroke,
+  because the stroke is the highest-contrast edge in the frame and the one crossing
+  the pixel grid at an angle. Build at up to 2x, rotate there with BICUBIC, reduce
+  LAST with LANCZOS. Wrong, this does not look like aliasing - it looks cheap.
+- **The stroke is OUTSIDE the art.** A filled rounded rect on a plate `2 * stroke`
+  larger, art composited into the middle. A stroke drawn inset eats the outer pixels
+  of art composed to its own edges, which on a gameplay capture means eating the HUD.
+- **The cue is a rounded rect, and it is cropped to its own ink.** An ellipse
+  inscribing a 1.6:1 card bulges ~20% of the card's height past every edge and in a
+  portrait cascade swallows the card below it; a rounded rect tracks the shape and
+  needs 3.5%. And the ring layer carries a transparent margin so rotation has room -
+  measure the layer instead of the ink and every number is wrong by that margin per
+  side, which reported a visibly clipped ring as fitting with a pixel to spare and
+  silently stole ~30px of headline from the variant that uses it.
+
+**The headline is fitted on two axes.** `fit_word` measures width only, which is
+right for one word in a column and wrong in a wide band: a one-word headline grows
+straight up through the kicker. `fit_box()` fits the string's **ink** to both the
+band width and the band height and returns the bbox, so the caller centres on ink
+rather than on a heavy face's ascender/descender box. The band's floor is **derived**
+from the topmost thing the fan actually drew - card or ring - not from a constant; a
+hand-set floor went stale the first time the fan moved.
+
+## Three renderers, one set of rules
+
+```
+python3 "$CLAUDE_PLUGIN_ROOT/lib/sticker_fan.py"   spec.json outdir   # the house language
+python3 "$CLAUDE_PLUGIN_ROOT/lib/thumbnail_web.py" spec.json outdir   # lit-card look
 python3 "$CLAUDE_PLUGIN_ROOT/lib/thumbnail.py"     spec.json outdir   # no Chrome
 ```
+
+`sticker_fan.py` is the default for this channel. The two below it are the earlier
+lit-card look and stay because they own the measurement layer that all three share -
+frame scoring, span distinctness, the salient point, the contrast check, the
+cap-height floor, the word cap and the JPEG cap - and because a single-game video
+with one strong subject is still better served by `blast` than by a fan of three.
 
 **Reach for `thumbnail_web.py`.** It lays the frame out in
 `lib/thumb-template.html` and screenshots it with headless Chrome at exactly
@@ -164,7 +258,8 @@ and `"frame"` plus `"flankers": [...]` overrides both with explicit paths.
 **Three cards, not eight.** A grid of eight tiles is the obvious way to say
 "catalogue" and it is wrong at feed size: eight 90px tiles are eight unreadable
 smears, and the evidence on aggressive simplicity is the strongest number in this
-skill. Three reads as "many" and stays legible.
+skill. Three reads as "many" and stays legible. The house language above holds the
+same count for the same reason and enforces it (`CARDS = 3`).
 
 `"cue_at": [fx, fy]` places the ring or arrow by hand, in fractions of the
 subject, when the measured salient point misses - edge energy on a
@@ -231,13 +326,29 @@ naming the spot is faster than arguing with the metric.
 the wide one re-proportioned. Three things make it different.
 
 **The frame you design is not the frame that gets seen.** Instagram crops a 9:16
-post to **4:5** for the profile grid and the feed card, so the real canvas is the
-middle 70% of the height: `GRID = (0.148, 0.852)`. The top and bottom eighths are
-for bleed and for Instagram's own furniture - the handle row above, the caption and
-button overlay below - and nothing that has to be read may go there. The renderer
-enforces it: any card, type column or sub bar that leaves the band is a warning
-naming the pixels. (Some surfaces still show 1:1, so treat the band's own top and
-bottom as soft edges rather than putting a sub line hard against them.)
+post to **4:5** for the feed card and to **1:1** for the profile grid, so the real
+canvas is the middle 70% of the height: `GRID = (0.148, 0.852)`, which on a 1920
+frame is `y 284..1636`, and the grid tile is only `y 420..1500`. The top and bottom
+eighths are for bleed and for Instagram's own furniture - the handle row above, the
+caption and button overlay below - and nothing that has to be read may go there.
+
+**This is the one rule that shipped broken, and the reason is worth internalising:
+a 1080x1920 file with the type at the top looks completely correct when you open
+it.** A portrait pass in the house language put the lockup at `y 132` and the
+headline band at `168..563` - the top eighth. The 4:5 crop cut the top third off
+every headline and removed the mark entirely; the 1:1 crop removed the headline
+outright. It passed a full-frame review, it passed the contact sheet's full-size
+row, and nothing about it was visible until somebody actually cropped the file.
+
+So: **open the 4:5 and the 1:1 crop, never the file.** `sticker_fan.py` ends in a
+`crop_guard()` that **exits** naming the pixels if the lockup, the headline's ink,
+the proof line, the hero card or any rank disc leaves the band - an exit rather
+than a warning precisely because a warning about a frame that opens perfectly well
+gets read as pedantry and ignored, which is what happened the first time. What it
+deliberately does NOT check is the art of the lower cards: in a cascade, a card cut
+by the bottom of the band is the design, and it is what says there are more than
+three. Do not widen `GRID` to make a layout fit - it is Instagram's number, not
+ours.
 
 **The cards are portrait.** The captures are 720x1280. A landscape card in a tall
 frame throws away most of the game and leaves dead ground either side of the
@@ -255,9 +366,12 @@ signal at feed size.
 Two things carry over from the old cover rules because they were right. **Three
 words rarely fit**: the column forces the cap height under the 13% floor, which is
 why the tool warns on the three-word variant here and not on the 16:9 one - two
-words is a cover's budget, and the launch bundle therefore ships two covers, not
-three. And covers **cannot be A/B tested**, so it is a straight pick from the
-contact sheet rather than a Test & Compare.
+words is a cover's budget. Treat that warning as information rather than a veto:
+the three-word variant is the one that carries the NUMBER, which is the strongest
+hook available, so if it clears the crop whole it can still be the pick. The
+countdown bundle ships all three covers and picks the three-word one; the launch
+bundle ships two. And covers **cannot be A/B tested**, so either way it is a
+straight pick from the contact sheet rather than a Test & Compare.
 
 On `blast`, the sub bar moves to the foot of GRID rather than closing the frame,
 and the type column stops above it - a bar flush to the bottom edge is a bar nobody
