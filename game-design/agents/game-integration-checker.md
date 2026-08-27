@@ -19,7 +19,13 @@ GAME_SLUG, GAME_NAME, GAME_TAGS (genre tags), and the list of ACHIEVEMENT IDs.
 - [ ] Game data exists (Astro): `apps/web-astro/src/data/games/{GAME_SLUG}.json`
 - [ ] Game JS exists: `apps/web-astro/public/games/{GAME_SLUG}/game.js`
 - [ ] Game CSS exists: `apps/web-astro/public/games/{GAME_SLUG}/styles.css` (if separate)
-- [ ] SVG thumbnail exists: `apps/web-astro/public/images/thumbnails/{GAME_SLUG}.svg`
+- [ ] SVG thumbnail (STILL) exists: `apps/web-astro/public/images/thumbnails/{GAME_SLUG}.svg`
+- [ ] If `apps/web-astro/public/images/thumbnails/animated/{GAME_SLUG}.svg` exists, the
+      still above is its generated output: `node scripts/thumbnail-still.js --check`
+      passes and `src/data/thumbnails-animated.ts` lists the slug
+- [ ] No raw `<img src="/images/thumbnails/` was introduced — thumbnails render through
+      `<GameArt>`; grep the diff. Nothing outside `GameArt.astro` references
+      `thumbnails/animated/`
 - [ ] Score validation config exists: `apps/api/src/leaderboard/config/game-config.ts` (grep for GAME_SLUG)
 - [ ] Service worker updated: `apps/web-astro/public/sw.js` (grep for GAME_SLUG paths)
 
