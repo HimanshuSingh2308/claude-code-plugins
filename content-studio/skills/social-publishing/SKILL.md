@@ -95,8 +95,8 @@ upload. Build `shorts/` in the bundle every time.
 Two videos on one channel carrying the same title read as a duplicate on the channel
 page and compete for the same query, so the Short takes a different phrasing of the
 same intent - the long-form leads with the category, the Short can lead first-person
-or with the number. Its description is shorter, it does not carry chapters, and never
-append `#shorts` to the title.
+or with the number. Its description is shorter, it does not carry chapters, and it carries two or three
+topical hashtags in the title - mandatory, see the YouTube Shorts section.
 
 **A 9:16 upload under three minutes becomes a Short automatically.** There is no
 setting to tick and no way to make it long-form, which is also why the 16:9 cut must
@@ -150,7 +150,36 @@ Title, under 100 chars, no clickbait caps. Patterns that fit the voice:
 | The near-miss | `Four rows with no clears, then this` |
 
 Append the game name only if it fits naturally; the description carries it
-anyway. Never append "#shorts" to the title - it is redundant and ugly.
+anyway.
+
+**Always put two or three topical hashtags in the Short's title.** Not optional and
+not a stylistic choice - a hashtag in a YouTube title renders as a clickable link into
+that hashtag's feed, which is a second discovery surface the description cannot reach,
+and it costs nothing but characters. A Shorts title with no hashtag is leaving a free
+channel on the table, so treat a bare title as a defect and fix it before upload.
+
+```
+Two saves in fourteen seconds - Neon Beats #rhythmgame #browsergames #shorts
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+                                           clickable, and the reason this rule exists
+```
+
+Rules that make it work rather than backfire:
+
+- **Two or three, never more.** They are part of the 100-character title, and the
+  title still has to read as a sentence to a human. Three short ones fit; five turn
+  the title into a tag dump and get truncated in search at ~60 chars anyway.
+- **Pick the genre and the platform words, not the game name.** `#rhythmgame`
+  `#browsergames` `#puzzlegame` are queries people actually browse. `#neonbeats` has
+  no feed worth entering yet, so it belongs in the description set, not the title.
+- **Count the whole video, not the title.** Over **15 hashtags across title plus
+  description together and YouTube ignores every hashtag on the video** - not just the
+  excess. Our description set runs 7-9, so the title's share is capped at 3 in practice.
+- **`#shorts` in the title is still banned.** A 9:16 upload under three minutes is
+  classified as a Short automatically; the tag adds nothing, and it is the one hashtag
+  that reads as filler to a human. The example above shows the failure, not the target.
+- **Same words, different order, per surface.** The long-form title takes hashtags too,
+  but do not paste the Short's title onto it - see "Same pixels, different metadata".
 
 Description:
 
@@ -230,6 +259,8 @@ is a strong query and a lie in three weeks; date the video or drop the number.
 | YT title | 100 chars | ~60 before truncation in search |
 | YT description | 5,000 chars | first 2-3 lines visible |
 | YT tags | 500 chars total | low ranking value, keep short |
+| YT hashtags | 15 per video | title + description **combined**; over 15 and YouTube ignores ALL of them |
+| YT title hashtags | count toward the 100 | 2-3 topical ones are mandatory on a Short |
 | YT Shorts | 3 min, vertical | must be 9:16 to be treated as a Short, automatically |
 | YT Shorts thumb | n/a in feed | still shows in search and the Shorts tab only |
 | IG Story | 24h, then gone | the Highlight is the deliverable, not the story |

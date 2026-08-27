@@ -90,26 +90,36 @@ export async function validatePlate(file, { minUniqueFps = 12 } = {}) {
   };
 }
 
-/* Fit to frame without letterboxing. A 9:16 plate into a 16:9 frame gets a
-   blurred, over-scaled copy of itself behind it, which is the convention for
-   portrait footage on YouTube and reads better than pillarbox bars. */
+/* Fit to frame without letterboxing. An aspect mismatch gets a blurred,
+   over-scaled copy of itself behind it, which is the convention on both
+   YouTube and Reels and reads better than hard bars.
+
+   The foreground has to fit whichever side is the constraint, and which side
+   that is flips with the target. A portrait plate into a 16:9 frame fits by
+   height; a LANDSCAPE plate into a 9:16 frame fits by width. Fitting a
+   landscape plate by height instead scales it to 3413x1920 and the overlay
+   shows the middle 1080px - about a third of the frame - which on a racing
+   game means the car with the speed and drift-score readouts cropped off
+   both edges. Landscape-only games are the normal case for that path, not an
+   edge case. */
 function videoFit(preset, plate) {
   const portraitPlate = plate.height >= plate.width;
   const portraitTarget = preset.h >= preset.w;
   if (portraitPlate === portraitTarget) {
     return `scale=${preset.w}:${preset.h}:force_original_aspect_ratio=increase,crop=${preset.w}:${preset.h}`;
   }
+  const fg = portraitTarget ? `scale=${preset.w}:-2` : `scale=-2:${preset.h}`;
   return `split=2[bg][fg];`
     + `[bg]scale=${preset.w}:${preset.h}:force_original_aspect_ratio=increase,crop=${preset.w}:${preset.h},`
     + `gblur=sigma=40,eq=brightness=-0.12[bgb];`
-    + `[fg]scale=-2:${preset.h}[fgs];`
-    + `[bgb][fgs]overlay=(W-w)/2:0`;
+    + `[fg]${fg}[fgs];`
+    + `[bgb][fgs]overlay=(W-w)/2:(H-h)/2`;
 }
 
 /* Ducking is sidechaincompress keyed on the VO, not a static music level: the
    bed stays present between lines and gets out of the way under them. A fixed
    -18dB bed either fights the voice or disappears entirely. */
-function buildFilter({ preset, plate, vo, musicIndex, hasGameAudio, assPath, offsetMs, targetMs }) {
+function buildFilter({ preset, plate, vo, musicIndex, sfxIndex = null, sfxGain = 0.55, hasGameAudio, assPath, offsetMs, targetMs }) {
   const parts = [];
   const fit = videoFit(preset, plate);
   /* fontsdir, not just the .ass file: libass falls back to a system font silently
@@ -154,11 +164,65 @@ function buildFilter({ preset, plate, vo, musicIndex, hasGameAudio, assPath, off
     bedLabel = '[bed]';
   }
 
+  /* Editorial SFX sit OUTSIDE the duck and outside the sidechain key, and that
+     placement is the whole point of a separate input. A hit on a cut has to be
+     heard THROUGH the voice - it is the edit made audible - so routing it with
+     the music would let sidechaincompress squash exactly the transients that
+     justify it, and routing it with the VO would make every whoosh gate the
+     bed. It is pre-timed by sfx.py against the picture's own cut list, so it
+     needs no delay here: one full-length track, mixed flat. */
+  let sfxLabel = null;
+  if (sfxIndex !== null) {
+    parts.push(`[${sfxIndex}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=${sfxGain}[sfx]`);
+    sfxLabel = '[sfx]';
+  }
+
   /* Loudness target, not just a limiter. IG and YouTube both normalise on
      ingest, so delivering around -14 LUFS with 1.5dB of true-peak headroom is
      what stops the platform pulling the whole mix down and taking the VO with
-     it. It also removes the AAC overshoot a bare limiter leaves behind. */
-  const master = `loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000`;
+     it.
+
+     `TP` here is a TARGET, not a guarantee. loudnorm runs single-pass, so its
+     gain trajectory adapts as the program plays and its internal limiter
+     overshoots on transients - and because the trajectory depends on the whole
+     program, adding a source can push an EARLIER passage over even where that
+     source is silent. Measured on the Fairway Nine long cut: raising sfxGain
+     took the master from -1.3 to +0.61 dBTP with 694 samples over full scale,
+     the earliest at 1.325s where the first sfx cue is still 1.4s away. So the
+     limiter below is not redundant with loudnorm - it is the only thing that
+     actually bounds the peak.
+
+     The ceiling is well below the -1.5 target because AAC decode overshoot is
+     large and content-dependent, so a ceiling equal to the target misses it
+     every time. Measured on the Fairway Nine cuts: the graph output before the
+     encoder sat at -2.86 dBFS against a -3.0 ceiling (the limiter is exact),
+     and the same audio came back from `aac -b:a 192k` at -1.54 in a two-step
+     encode and about -0.45 in this single pass - 1.3 to 2.5 dB of overshoot on
+     the dense vertical mix, against a few tenths on the sparser long one. 0.63
+     is -4.0 dBFS, which covers the worst case observed and still leaves the
+     long cut comfortable rather than squashed.
+
+     This costs nothing audible: loudnorm above sets the loudness, and the
+     ceiling only shapes peaks. Cue levels sit around -8 dB, well under it, so
+     it shapes the game audio and VO peaks and leaves the sfx layer alone -
+     which matters, because squashing those transients would undo the whole
+     point of balancing them.
+
+     Measure with astats `Peak level dB` on the finished mp4. Do NOT measure by
+     piping `-f f32le` into a script - that read reported 1.29 peak with 162
+     samples over full scale on a file astats and loudnorm both put at -0.45,
+     and chasing that phantom cost real time. */
+  const master = `loudnorm=I=-14:TP=-1.5:LRA=11,`
+    + `alimiter=level_in=1:level_out=1:limit=0.63:attack=1:release=60:level=disabled,`
+    + `aresample=48000`;
+
+  /* `sfx` is appended to whatever the mix already is, so the master pass is the
+     only gain stage that sees all four sources. */
+  const withSfx = (labels, tag) => {
+    const all = sfxLabel ? [...labels, sfxLabel] : labels;
+    if (all.length === 1) return `${all[0]}${master}[a]`;
+    return `${all.join('')}amix=inputs=${all.length}:normalize=0:dropout_transition=0,${master}[a]`;
+  };
 
   if (voLabel && bedLabel) {
     /* The sidechain key gates the bed, and sidechaincompress ends when its
@@ -168,20 +232,24 @@ function buildFilter({ preset, plate, vo, musicIndex, hasGameAudio, assPath, off
     parts.push(`${voLabel}asplit=2[vo_mix][vo_key_raw]`);
     parts.push(`[vo_key_raw]apad=whole_dur=${targetMs}ms[vo_key]`);
     parts.push(`${bedLabel}[vo_key]sidechaincompress=threshold=0.04:ratio=9:attack=15:release=340:makeup=1[bedduck]`);
-    parts.push(`[bedduck][vo_mix]amix=inputs=2:normalize=0:dropout_transition=0,${master}[a]`);
+    parts.push(withSfx(['[bedduck]', '[vo_mix]']));
   } else if (voLabel) {
-    parts.push(`${voLabel}${master}[a]`);
+    parts.push(withSfx([voLabel]));
   } else if (bedLabel) {
-    parts.push(`${bedLabel}${master}[a]`);
+    parts.push(withSfx([bedLabel]));
+  } else if (sfxLabel) {
+    parts.push(withSfx([]));
   }
 
-  return { filter: parts.join(';'), hasAudioOut: Boolean(voLabel || bedLabel) };
+  return { filter: parts.join(';'), hasAudioOut: Boolean(voLabel || bedLabel || sfxLabel) };
 }
 
 export async function render({
   plate,
   vo = { lines: [] },
   music = null,
+  sfx = null,
+  sfxGain = 0.55,
   ass = null,
   out,
   platform = 'reel',
@@ -206,6 +274,14 @@ export async function render({
     musicIndex = 1 + vo.lines.length;
     args.push('-stream_loop', '-1', '-i', music);
   }
+  /* Not looped: an SFX track is cut to this timeline's length and looping it
+     would replay the cue list over the tail. */
+  let sfxIndex = null;
+  if (sfx) {
+    if (!existsSync(sfx)) throw new Error(`sfx track not found: ${sfx}`);
+    sfxIndex = 1 + vo.lines.length + (musicIndex !== null ? 1 : 0);
+    args.push('-i', sfx);
+  }
 
   // The plate is the shortest input once music is looping, so the target length
   // is whichever of plate and VO runs longer, clamped to the platform cap.
@@ -217,8 +293,8 @@ export async function render({
   );
 
   const { filter, hasAudioOut } = buildFilter({
-    preset, plate: check, vo, musicIndex, hasGameAudio: check.hasAudio, assPath: ass, offsetMs,
-    targetMs: target,
+    preset, plate: check, vo, musicIndex, sfxIndex, sfxGain, hasGameAudio: check.hasAudio,
+    assPath: ass, offsetMs, targetMs: target,
   });
 
   args.push('-filter_complex', filter, '-map', '[v]');

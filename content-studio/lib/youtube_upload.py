@@ -2,6 +2,7 @@
 """Upload one video to YouTube, resumably, with no third-party dependencies.
 
     python3 youtube_upload.py video.mp4 meta.json [--thumbnail t.jpg] [--dry-run]
+                             [--no-title-hashtags]
     python3 youtube_upload.py --set-thumbnail VIDEO_ID thumb.jpg
     python3 youtube_upload.py --update VIDEO_ID meta.json
 
@@ -36,6 +37,7 @@ retry. The session URL survives a dropped socket; a multipart POST does not.
 import http.server
 import json
 import mimetypes
+import re
 import subprocess
 import sys
 import urllib.error
@@ -300,10 +302,63 @@ def surface(video):
             + (' - vertical but over 3 min' if h > w else ''))
 
 
+
+def check_hashtags(meta, is_short, override):
+    """A Shorts title without hashtags is a defect, so refuse the upload.
+
+    A hashtag in a YouTube title renders as a clickable link into that hashtag's
+    feed - a discovery surface the description cannot reach. It is free and it was
+    being forgotten every time it depended on remembering, so it is enforced here
+    rather than documented: the check runs before a single byte is uploaded, and
+    the only escape is explicit.
+
+    The 15 is YouTube's own rule and the reason this counts BOTH fields: exceed 15
+    hashtags across title plus description and YouTube ignores every hashtag on the
+    video, not merely the ones past the limit. Silently losing all of them is a
+    worse outcome than the bare title this guard exists to prevent.
+    """
+    title, desc = meta['title'], meta.get('description', '')
+    tt = re.findall(r'#\w+', title)
+    dt = re.findall(r'#\w+', desc)
+
+    if len(title) > 100:
+        sys.exit(f'title is {len(title)} chars, over YouTube\'s 100-char cap:\n  {title}')
+
+    total = len(tt) + len(dt)
+    if total > 15:
+        sys.exit(f'{total} hashtags across title ({len(tt)}) and description ({len(dt)}). '
+                 f'Over 15 and YouTube ignores ALL of them, so this would publish with '
+                 f'no working hashtags at all. Cut to 15 or fewer.')
+
+    low = [h.lower() for h in tt]
+    if '#shorts' in low:
+        sys.exit('the title carries #shorts. A 9:16 upload under three minutes is '
+                 'classified as a Short automatically, so it buys nothing and reads as '
+                 'filler. Use topical hashtags instead - genre and platform words.')
+
+    if is_short and not tt and not override:
+        sys.exit('this is a Short and its title has no hashtags. Two or three topical '
+                 'ones (genre and platform words, e.g. #rhythmgame #browsergames) are '
+                 'mandatory - they are clickable in the title and cost only characters. '
+                 f'{100 - len(title)} chars spare. Add them, or pass '
+                 '--no-title-hashtags if this one is a deliberate exception.')
+
+    if is_short and len(tt) > 3:
+        sys.exit(f'{len(tt)} hashtags in the title. Two or three; more turns the title '
+                 f'into a tag dump and search truncates it near 60 chars anyway.')
+
+    if is_short and not tt and override:
+        print('hashtags: NONE in the title, and --no-title-hashtags was passed. '
+              'This Short ships without the clickable-title surface.')
+    if tt:
+        print(f'hashtags: {len(tt)} in the title ({" ".join(tt)}), '
+              f'{len(dt)} in the description, {total}/15 total')
+
+
 def main():
     args = sys.argv[1:]
     dry = '--dry-run' in args
-    args = [a for a in args if a != '--dry-run']
+    args = [a for a in args if a not in ('--dry-run', '--no-title-hashtags')]
     if '--set-thumbnail' in args:
         i = args.index('--set-thumbnail')
         set_thumbnail(args[i + 1], Path(args[i + 2]), token())
@@ -333,6 +388,8 @@ def main():
     s = surface(video)
     if s:
         print(f"surface: {s}")
+    check_hashtags(meta, bool(s and s.startswith('Short')),
+                   '--no-title-hashtags' in sys.argv)
     if dry:
         print('dry run, nothing uploaded')
         return

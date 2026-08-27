@@ -142,12 +142,22 @@ export function buildAss({ vo, overlays = [], platform = 'reel', offsetMs = 0 })
     const anim = style === 'Stat'
       ? `{\\fad(80,180)\\fscx60\\fscy60\\t(0,160,\\fscx110\\fscy110)\\t(160,260,\\fscx100\\fscy100)}`
       : `{\\fad(140,140)}`;
-    events.push({ start, end, style, text: `${anim}${escapeAss(String(ov.text).toUpperCase())}`, layer: 1 });
+    /* `marginV` per overlay, because one style cannot serve both orientations.
+       Hook's own MarginV is 180: the top 9% of the 1080x1920 frame the styles
+       were tuned for, and the top 17% of a 1920x1080 one. A portrait plate in a
+       landscape frame had pillarboxes to print into; a native desktop capture
+       fills the frame, so the band that was empty is now a heading. Zero means
+       "inherit the style", which is what every existing shot spec gets. */
+    events.push({
+      start, end, style, layer: 1,
+      marginV: ov.marginV || 0,
+      text: `${anim}${escapeAss(String(ov.text).toUpperCase())}`,
+    });
   }
 
   events.sort((a, b) => a.start - b.start || a.layer - b.layer);
   const body = events
-    .map((e) => `Dialogue: ${e.layer},${ts(e.start)},${ts(e.end)},${e.style},,0,0,0,,${e.text}`)
+    .map((e) => `Dialogue: ${e.layer},${ts(e.start)},${ts(e.end)},${e.style},,0,0,${e.marginV || 0},,${e.text}`)
     .join('\n');
   return `${assHeader(area)}${body}\n`;
 }
