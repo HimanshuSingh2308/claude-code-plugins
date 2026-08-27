@@ -49,7 +49,9 @@ apps/web-astro/
     games/{game-id}/                ← Game code — CREATE THESE:
       game.js                         ALL game logic, in ONE file, wrapped in an IIFE
       styles.css                      Game-specific CSS (optional)
-    images/thumbnails/{game-id}.svg ← Card thumbnail — CREATE THIS
+    images/thumbnails/{game-id}.svg ← Card thumbnail (STILL) — CREATE THIS
+    images/thumbnails/animated/{game-id}.svg ← OPTIONAL animated source; the
+                                      still above is GENERATED from it — see 3D
     og/{game-id}.png                ← Social share image — GENERATE THIS
     sw.js                           ← Service worker (bump CACHE_VERSION)
 ```
@@ -604,22 +606,24 @@ Then continue to Phase 3 (landing page updates) and Phase 4+ as normal.
 
 The `game-landing-updater` agent handles ALL public-facing pages:
 
-### 3A. Homepage (`apps/web-astro/src/pages/index.astro`) — 7 changes
+### 3A. Homepage (`apps/web-astro/src/pages/index.astro`) — 4 changes
 
 1. **Hero featured section** — Update `<div class="hero-featured">` with new game name, description, tags
 2. **Hero CTA button** — Update href and button text to new game
-3. **Hero thumbnail** — Update `<a class="hero-thumb">` link, image src, and alt text
-4. **Game count** — Increment count in hero description, stats banner, meta description, OG/Twitter description
-5. **Remove previous NEW badge** — Delete `<span class="thumb-badge">NEW</span>` from previous game cards
-6. **Add new game card** — Add card with `<span class="thumb-badge">NEW</span>` in `.games-grid`
-7. **JSON-LD and SEO meta** — Update structured data and meta tags
+3. **Hero thumbnail** — Update the `<a class="hero-thumb">` href and the `<GameArt id alt>`
+   inside it. There is no `<img src>` to edit, and `alwaysAnimate` stays (see 3D)
+4. **JSON-LD and SEO meta** — Update structured data and meta tags
 
-### 3B. Games Index Page (`apps/web-astro/src/pages/games/index.astro`) — 4 changes
+**AUTOMATIC, do not hand-edit:** game counts (computed from the game data JSON glob), the
+poster-wall cards (`GAMES_NEWEST_FIRST.map(<GameTile …>)`), and the NEW badge (derived
+from `NEWEST_GAME`). `<span class="thumb-badge">NEW</span>` no longer exists — do not
+search for it, and never hand-write a card with a raw `<img src="/images/thumbnails/…">`.
 
-1. **Add new game card** — Add card in `.games-grid` with NEW badge, matching `data-genres`
-2. **Remove previous NEW badges** — Remove from all previous game cards
-3. **Update ItemList JSON-LD** — Add game to `itemListElement` array, update `numberOfItems`
-4. **Update game count** — Section header, meta description, OG description, intro text
+### 3B. Games Index Page (`apps/web-astro/src/pages/games/index.astro`) — 0 changes
+
+Everything on this page is derived from the game data JSON: the cards
+(`GAMES_NEWEST_FIRST.map(<GameResult …>)`), the NEW badge, the genre filters, the ItemList
+JSON-LD and every count. Creating the JSON in Phase 2 is the whole change.
 
 ### 3C. Category Pages — based on GAME_TAGS
 
@@ -639,6 +643,62 @@ For each matching category page:
 The `CategoryPage.astro` component auto-generates the game cards, ItemList schema, and game count from the `games` array — no other changes needed per category page.
 
 If a genre has no category page (e.g., `sports`, `simulation`), skip it and note in output.
+
+
+### 3D. Thumbnail — still by default, animated on hover
+
+**Read `docs/thumbnail-guidelines.md` in the repo before creating or editing a thumbnail.**
+Author at 400x300, design for the category card's visible band (y 74..226), and note that
+the wall's NEW badge owns a corner.
+
+The wiring, which is what a new game must not get wrong:
+
+| | |
+|---|---|
+| `public/images/thumbnails/{GAME_SLUG}.svg` | The STILL. What every grid, rail, wall, category card, `og:image`, JSON-LD entry and `llms.txt` line resolves to, via `gameThumb(id)`. **A still-only thumbnail is this one file and nothing else** — no list to register in, no component to touch. |
+| `public/images/thumbnails/animated/{GAME_SLUG}.svg` | OPTIONAL animated source. If it exists, the still above is GENERATED from it by `node scripts/thumbnail-still.js` and **must never be hand-edited**. The generator also writes `src/data/thumbnails-animated.ts` from the directory listing, so there is still nothing to register. Commit both; the build regenerates and CI fails on `thumbnail-still.js --check` if they drift. |
+
+**Why the shipped image is a still.** An animated SVG in an `<img>` is one atomic image to
+the browser: nothing inside it can be promoted to a compositor layer, so every frame is a
+main-thread repaint of the whole image for as long as it is on screen. Fourteen animated
+tiles on a parked homepage measured 1927ms of paint in a 3000ms window against 799ms as
+stills, throttled phone profile. That was the site's Android scroll jank, and only the
+NUMBER of animated images on screen matters — cheaper SVG internals do not help.
+
+So every grid, rail and card ships the still and reveals the animated original in a second
+`<img>` that is `display: none` until hover, which means the animated file is never even
+requested until a pointer lands on the card. **Touch devices stay static, on purpose.**
+
+Rules:
+
+- **Never point a card, grid or rail at `animated/`.** That path is the hover layer's
+  source and nothing else.
+- **Render through `<GameArt id alt />`, never a hand-written `<img>`.** A bare `<img>`
+  opts that surface out of animation silently, because the still is correct on its own.
+- **A new surface needs `ga-host` on the hoverable ancestor** (the reveal rule lives once
+  in `BaseLayout.astro`'s global block) **and `position: relative` on the frame** the image
+  fills (the hover layer is `absolute; inset: 0`). Do not write CSS targeting `.ga-motion`
+  — its `display: none` is what keeps 25 animated files from being fetched at page load.
+- **`alwaysAnimate` is only for a surface showing ONE thumbnail:** the homepage hero and
+  game landing pages. It renders the animated file directly with no hover layer, and falls
+  back to the still by itself when a game's thumbnail was never animated.
+- If animating: **CSS only, never SMIL** (SMIL ignores `prefers-reduced-motion`), every
+  keyframe starts from identity, and the reduced-motion block is what the generated still
+  is built from. Anything the animation is the only source of (a colour that lives solely
+  in a keyframe) must also exist as a base attribute, or it vanishes from the still and
+  from the og image.
+- Never put an animated CSS `transform` on an element that also has a `transform`
+  attribute — the animation replaces the attribute and the element snaps to the origin.
+  Outer `<g transform>` places, inner `<g class>` animates.
+
+Then:
+
+```
+node scripts/thumbnail-still.js     # only if you authored an animated source
+node scripts/thumbnail-lint.js      # lints BOTH directories
+```
+
+and bump `CACHE_VERSION` in `apps/web-astro/public/sw.js`.
 
 ---
 
@@ -718,8 +778,10 @@ automatically included in the sitemap at build time.
 4. Edit `packages/shared/src/lib/constants/game-registry.ts` — add GAME_REGISTRY entry
 5. Edit `packages/shared/src/lib/constants/achievements.ts` — register all achievements
 6. Edit `packages/shared/src/lib/types/achievement.types.ts` — add category to union type
-7. Edit `apps/web-astro/src/pages/index.astro` — hero, CTA, thumbnail, NEW badge, game card (counts are AUTOMATIC)
-8. Edit `apps/web-astro/src/pages/games/index.astro` — add game card + remove old NEW badges (counts/ItemList are AUTOMATIC)
+7. Create `apps/web-astro/public/images/thumbnails/GAME_SLUG.svg` (see 3D). If animated,
+   author `.../thumbnails/animated/GAME_SLUG.svg` and run `node scripts/thumbnail-still.js`
+8. Edit `apps/web-astro/src/pages/index.astro` — hero text, CTA, hero `<GameArt id>`, JSON-LD
+   (counts, cards and the NEW badge are AUTOMATIC; `/games/` needs NO edit at all)
 9. Edit matching category pages (`games/puzzle/`, `games/arcade/`, `games/strategy/`, `games/3d/`) — add to `games` array
 10. Rebuild shared: `npx nx run shared:build`
 11. Build Astro: `npx nx run web-astro:build`
@@ -764,20 +826,33 @@ automatically included in the sitemap at build time.
 - [ ] `showConfetti()` called on win
 - [ ] `addXP()` called in `onGameEnd()`
 
+**Thumbnail:**
+- [ ] Still exists at `apps/web-astro/public/images/thumbnails/GAME_SLUG.svg`, 400x300,
+      every subject inside y 74..226
+- [ ] If animated: the SOURCE is at `.../thumbnails/animated/GAME_SLUG.svg`, CSS animation
+      only (no SMIL), keyframes start from identity, `prefers-reduced-motion` disables all
+      of it, and nothing takes its only value from a keyframe
+- [ ] If animated: `node scripts/thumbnail-still.js` run and BOTH the still and
+      `src/data/thumbnails-animated.ts` committed (CI checks with `--check`)
+- [ ] The generated `thumbnails/GAME_SLUG.svg` was not hand-edited
+- [ ] No raw `<img src="/images/thumbnails/…">` was added anywhere — thumbnails render
+      through `<GameArt>`; any NEW surface also has `ga-host` + `position: relative`
+- [ ] Nothing points a grid, rail or card at `animated/`
+- [ ] `node scripts/thumbnail-lint.js` clean
+- [ ] `CACHE_VERSION` bumped in `apps/web-astro/public/sw.js`
+
 **Homepage (`index.astro`):**
 - [ ] Hero featured section updated (game name, description, tags)
 - [ ] Hero CTA button updated (href + text)
-- [ ] Hero thumbnail updated (image src + alt)
+- [ ] Hero `<GameArt id alt>` updated, `alwaysAnimate` kept, no `ga-host` added
 - [ ] Game counts — AUTOMATIC (driven by `import.meta.glob` from game data JSON files, no manual edit needed)
-- [ ] NEW badge removed from all previous game cards
-- [ ] New game card added at **position 0** (top of grid) with `<span class="thumb-badge">NEW</span>` and `data-genres`
+- [ ] Poster-wall cards and the NEW badge — AUTOMATIC (`GameTile` + `NEWEST_GAME`); no card
+      markup written and no `thumb-badge` touched
 - [ ] JSON-LD and SEO meta updated
 
 **Games Index Page (`/games/index.astro`):**
-- [ ] New game card added at **position 0** (top of grid) with NEW badge
-- [ ] Previous NEW badges removed from other cards
-- [ ] ItemList JSON-LD — AUTOMATIC (generated from `import.meta.glob`, no manual edit needed)
-- [ ] Game counts — AUTOMATIC (same glob pattern, no manual edit needed)
+- [ ] Untouched — cards, NEW badge, genre filters, ItemList and counts are all derived
+      from the game data JSON
 
 **Category Pages:**
 - [ ] Game added to `games` array (at **index 0**) in each matching category page frontmatter
