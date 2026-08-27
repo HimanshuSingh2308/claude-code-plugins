@@ -124,7 +124,7 @@
       "name": "content-studio",
       "source": "./content-studio",
       "description": "Turns a browser game into engaging short-form and long-form video: game brief, shot planning, deterministic gameplay capture, TTS voiceover, burned-in captions, ffmpeg render, and a local approval gate before anything reaches Instagram or YouTube.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "author": {
         "name": "Himanshu Singh"
       },

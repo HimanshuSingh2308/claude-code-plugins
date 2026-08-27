@@ -39,6 +39,10 @@ Produce one finished, unpublished clip for **$1**.
    (IG caption, YT title, hashtags), `music` if a bed exists in
    `content/music/`, and `preferMark` plus `preferMarkAtMs` so takes can be
    scored on timing.
+   The YT title for a vertical cut must carry two or three topical hashtags -
+   `youtube_upload.py` refuses a Short whose title has none. Genre and platform
+   words, not the game name; see `social-publishing`.
+
 4. **Shoot it:**
    ```bash
    node <plugin>/lib/shoot.mjs content/shots/$1/<shot-id>.json \

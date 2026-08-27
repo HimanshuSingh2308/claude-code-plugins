@@ -24,6 +24,9 @@ Serve every rendered shot for approval. Nothing here publishes.
    - a shot whose `preferMark` never fired (visible in `marks` in `shot.json`)
    - VO that runs longer than the plate
    - missing `metadata.igCaption` or `metadata.ytTitle`
+   - a `metadata.ytTitle` with no hashtags, on any shot that renders a vertical
+     cut - the Short's title needs two or three topical ones and the upload will
+     refuse without them, so catch it at review rather than at publish
 5. Leave the server running and stop describing the clips. The point of the gate
    is that a person watches them.
 

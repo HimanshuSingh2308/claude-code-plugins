@@ -175,6 +175,8 @@ export async function shoot(shot, opts = {}) {
       plate,
       vo,
       music: shot.music || null,
+      sfx: shot.sfx || null,
+      ...(shot.sfxGain ? { sfxGain: shot.sfxGain } : {}),
       ass,
       out,
       platform,
