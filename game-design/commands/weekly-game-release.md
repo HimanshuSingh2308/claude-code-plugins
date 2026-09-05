@@ -31,6 +31,7 @@ This command orchestrates the entire weekly game release by coordinating:
 | `css-game-art` | Knowledge | CSS character/environment art |
 | `game-accessibility` | Knowledge | Inclusive design patterns |
 | `playtesting` | Knowledge | Self-testing methodology, feel/pacing evaluation |
+| `state-sweep` | Skill | Long-run leak sweep: listeners, DOM, timers, audio, loops |
 | `post-launch` | Knowledge | Post-release monitoring, iteration priorities |
 | `game-code-reviewer` | Agent | Code quality scoring |
 | `game-qa-tester` | Agent | Bug detection |
@@ -388,6 +389,64 @@ Knowledge: playtesting
   - Log feel/pacing issues as MEDIUM GitHub issues for post-launch tuning
 ```
 
+### Phase 6.5: State Sweep (Mandatory Gate)
+
+**Phase 6 proves the game works. This phase proves it still works in twenty
+minutes.** Every earlier phase tests a game that was loaded seconds ago: QA
+plays a round, Visual QA screenshots a screen, Lighthouse measures a cold load.
+None of them can see state that survives a round or a screen change, and that is
+the class of defect players hit hardest - the session that gets slower the
+longer it is good.
+
+Run it here, after CRITICAL/HIGH bugs are fixed, because the sweep has to be
+able to drive the game end to end. Run it again after any Phase 7-9 fix that
+touches `game.js`.
+
+```yaml
+Skill: state-sweep
+Input: the game on the local dev server, in a real browser (chrome-devtools MCP)
+Output: four measured slopes + a named owner for every pending timer,
+        included verbatim in the PR description
+
+Phases (all four, in order - each catches a different class):
+  0. Verify the probe installed as initScript and the service worker is gone.
+     A sweep with the probe installed late, or against a stale SW, reads clean
+     on a leaking game. Confirm `typeof window.__live === 'function'` first.
+  1. Static pass - attribute every addEventListener to its enclosing function;
+     name the drain site for every module-level collection; check every
+     size-keyed cache's call sites; check startLoop has a re-entry guard.
+  2. Screen cycles, 25x - live listeners and DOM element count must be flat
+     from cycle 2 onward.
+  3. Round trips, 12x - same two, plus rafLive === 0 on every non-animating
+     screen.
+  4. Sustained run, 90s minimum (3 min preferred), bucketed every 10s -
+     frame p50/p95, audio source gap, DOM and heap all with no slope.
+
+PASS requires ALL of:
+  - live listeners flat across cycles 2..25 (first cycle may rise once)
+  - DOM element count flat across cycles 2..25 and across all 12 round trips
+  - rafLive === 0 on every lobby/menu snapshot
+  - frames.p50 and frames.p95 with no upward slope across the buckets
+  - audio.gap non-trending while audio.srcMade climbs into the thousands
+  - every pending timer attributed to a named file by its creation stack
+
+FAIL handling, by owner:
+  - In this game's files          -> fix, re-run the phase that found it
+  - In shared/third-party files   -> report with the stack, DO NOT edit.
+                                     api-client.js and auth.js are BLOCKED
+                                     (see orchestrator-guardrails)
+  - Bounded but unbounded-looking -> name the bound and the realistic ceiling
+                                     in the report so the next sweep does not
+                                     re-litigate it
+
+Do NOT accept a verdict without the numbers. "No leaks found" with no slopes
+attached means the sweep was not run, or was run against the wrong build.
+```
+
+**Gate: do not start Phase 7 until all four sub-phases have run and their
+numbers are in the report.** A game that accumulates is shippable-looking at
+every other gate in this workflow.
+
 ### Phase 7: Security Validation
 
 ```yaml
@@ -568,6 +627,7 @@ When using `--dry-run`, the orchestrator simulates all phases and outputs:
 | Review | Estimated | Initial review pending |
 | Visual QA | Estimated | Desktop + mobile screenshots pending |
 | QA | Estimated | Testing pending |
+| State Sweep | Estimated | Leak sweep pending (4 sub-phases) |
 | Security | Estimated | Validation pending |
 | Economy | Estimated | Balance validation pending |
 | Accessibility | Estimated | Audit pending |
