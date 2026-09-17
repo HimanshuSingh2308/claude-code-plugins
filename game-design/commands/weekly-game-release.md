@@ -33,6 +33,8 @@ This command orchestrates the entire weekly game release by coordinating:
 | `playtesting` | Knowledge | Self-testing methodology, feel/pacing evaluation |
 | `state-sweep` | Skill | Long-run leak sweep: listeners, DOM, timers, audio, loops |
 | `post-launch` | Knowledge | Post-release monitoring, iteration priorities |
+| `game-environment-art` | Skill | World art: budgets, cheap tricks, palette, critique checklist |
+| `game-environment-artist` | Agent | Environment art pass on the built game (Phase 3.5) |
 | `game-code-reviewer` | Agent | Code quality scoring |
 | `game-qa-tester` | Agent | Bug detection |
 | `game-visual-tester` | Agent | Screenshot-based visual QA |
@@ -233,6 +235,11 @@ For the viewport itself, deliver a **flat placeholder block at the correct aspec
 position**, not an illustration of the 3D scene. The deliverable answers "what does the UI
 around and on top of the 3D view look like, at every size" — nothing more.
 
+**Where the 3D scene art does get owned: Phase 3.5 (Environment Art Pass).** "Not designed
+here" has historically meant "not designed anywhere": the world ended up looking however it
+looked after Phase 3 got the game working. Phase 3.5 is the phase that owns whether it looks
+good, and it runs on the built scene where the decisions can actually be measured.
+
 Existing 3D games for reference: `chess-3d`, `cricket-blitz`, `drift-legends`, `lumble`,
 `strait-runner`.
 
@@ -298,6 +305,91 @@ Guardrails Applied:
 ```
 
 **Gate: Phase 3 is NOT complete until `game-integration-checker` reports all checks passing.** If integration checks fail, fix the issues before proceeding to Phase 4.
+
+### Phase 3.5: Environment Art Pass (Mandatory Gate)
+
+**Phase 3 makes the game work. This phase makes the world look like someone decided how it
+should look.** Nothing before this phase owns that. Phase 2.5 settles the UI and explicitly
+hands the 3D scene forward; Phase 3 builds the scene while it is also solving game logic,
+which is exactly when palettes get invented per-prop and lighting gets whatever the first
+`HemisphericLight` gave. The result ships looking accidental.
+
+Run it here, after Build and after the `game-integration-checker` gate, and before Phase 4-6.
+Two reasons for that position: the scene has to exist and render before it can be art-directed
+or measured, and **QA should be judging finished art, not placeholders.** A visual QA pass over
+placeholder art produces bug reports that evaporate the moment the art lands.
+
+```yaml
+Agent: game-environment-artist
+Skill: game-environment-art (the agent loads it; every number comes from there)
+Input: the built game on the local dev server, in a real browser (chrome-devtools MCP)
+       + the Phase 2.5 design tokens (the world palette must agree with the HUD palette)
+Output: an art direction, the implemented changes, a before/after budget table,
+        four images, and the 41-item critique checklist result
+
+Scope by rendering mode:
+  3D (Babylon):
+    - Palette collapsed into one constants module; no inline hex survives
+    - Baked AO in vertex colours + a contact-shadow blob under every prop
+    - One global world-space bevel width; unseen faces deleted
+    - One key light + hemispheric ambient (warm key / cool ground) + fake rim on
+      heroes and interactives only
+    - 3-8 materials, one atlas each, everything static merged and frozen
+    - Fog tinted to the background; gradient sky, not a flat clear colour
+    - Vignette/grade as a CSS overlay over the canvas, NOT a post pass
+  2D (canvas / DOM):
+    - A hard palette of 16-32 colours, every sprite and tile quantised to it
+    - One tile size, dual-grid autotiling, interior variants + a decoration layer
+    - 3-5 parallax layers with contrast and saturation falling off toward the
+      background (the tint matters more than the motion, and applies even if the
+      scene does not scroll)
+    - Light baked into the art + a tint multiply; a composited light layer only if
+      dynamic light is a mechanic
+    - A soft ellipse under every sprite that stands on the ground
+  BOTH:
+    - Composition, density rhythm and focal hierarchy fixed BEFORE any asset work.
+      It is free and it is usually most of the problem
+    - The accent hue reserved for interactive objects, plus a second non-colour cue
+
+Guardrails Applied:
+  BLOCKED:
+    - Any change that moves an interaction hitbox, collision shape or spawn point
+    - api-client.js, auth.js, shared packages, other games
+  CONFIRM:
+    - Adding any third-party asset (license must be recorded; CC0 preferred,
+      CC BY drags an attribution obligation into the repo)
+  SAFE:
+    - Scene/renderer files for THIS game, its palette constants, its generated assets
+
+PASS requires ALL of:
+  - The four budget numbers MEASURED before and after, not asserted:
+      draw calls under 50, triangles under 50k, materials under 8,
+      texture memory (sum of w*h*4*1.33) under 32 MB
+  - 60 fps sustained at 60 seconds under CPU throttling, not just at first frame
+  - Four images attached, captured at the REAL camera at real device resolution:
+      before/after, greyscale, silhouette, and a prop contact sheet if more than
+      about six props changed
+  - The 41-item critique checklist run, with every failing item named and either
+      fixed or explicitly deferred with a reason
+  - Every added asset carries a license record
+
+FAIL handling:
+  - A budget regressed          -> fix or revert that change; the pass is not done
+  - Fix lives in a blocked file -> report file and line, DO NOT edit
+  - Art change would alter      -> stop and report. Gameplay wins over composition
+    what the player can hit        every time
+  - Scene will not render       -> that is a build problem. Return to Phase 3
+```
+
+**Gate: do not start Phase 4 until the before/after budget table is filled with measured
+numbers and the checklist result is in the report.** "Looks better" with no numbers and no
+images means the pass was not run, or was run against the wrong build. A pass that changes
+nothing and explains why the art was already deliberate and on budget is a valid outcome and
+is better than churn.
+
+**Never approve a Blender render or a desktop-only screenshot.** Both lie, in different
+directions: Blender lies about lighting and colour space, desktop lies about how much detail
+survives. Review in-game, at phone size.
 
 ### Phase 4: Review Loop
 
@@ -624,6 +716,7 @@ When using `--dry-run`, the orchestrator simulates all phases and outputs:
 | Design | Simulated | PRD with 14 sections |
 | Visual Design | Simulated | 6 screens x 4 breakpoints, tokens + CSS art |
 | Build | Simulated | 3 files to create, 3 to modify |
+| Environment Art | Estimated | Art pass pending (budget table + 41-item checklist) |
 | Review | Estimated | Initial review pending |
 | Visual QA | Estimated | Desktop + mobile screenshots pending |
 | QA | Estimated | Testing pending |

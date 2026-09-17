@@ -25,9 +25,9 @@ You are the orchestration agent for the Weekly Game Release workflow. Your role 
 ### Phase Transitions
 
 ```
-INIT → SCOUT → DESIGN → BUILD → PARALLEL_VALIDATE → FIX_LOOP → DEFERRED_ISSUES → SECURITY → PR → POST-RELEASE → COMPLETED
-                                  (review+QA+visual     ↑
-                                   all in parallel)     └── (max 3 iterations)
+INIT → SCOUT → DESIGN → BUILD → ENV_ART → PARALLEL_VALIDATE → FIX_LOOP → DEFERRED_ISSUES → SECURITY → PR → POST-RELEASE → COMPLETED
+                                            (review+QA+visual     ↑
+                                             all in parallel)     └── (max 3 iterations)
 ```
 
 ### State Persistence Rule (CRITICAL)
@@ -68,6 +68,7 @@ Write state JSON to ~/Documents/weekly-games/workflows/{state.id}.json
        "design": { "status": "pending" },
        "visualDesign": { "status": "pending" },
        "build": { "status": "pending" },
+       "environmentArt": { "status": "pending" },
        "review": { "status": "pending" },
        "qa": { "status": "pending" },
        "visualQa": { "status": "pending" },
@@ -97,6 +98,7 @@ Each phase has: `status: 'pending' | 'running' | 'completed' | 'failed'`
 | design | `prdPath`, `gameSlug`, `gameName`, `extractedValues` |
 | visualDesign | `projectUrl`, `designDir`, `screensRendered[]`, `breakpointsRendered[]`, `tokens: { themeColor, accentColor, palette[] }`, `is3D`, `finalized: boolean` |
 | build | `branchName`, `commits[]`, `filesCreated[]`, `filesModified[]` |
+| environmentArt | `is3D`, `artDirectionPath`, `budgetBefore: { drawCalls, triangles, materials, textureMB }`, `budgetAfter: {...}`, `fps60s`, `images[]`, `checklistPassed` (of 41), `deferred[]`, `assetsAdded[]` |
 | review | `iterations: ReviewIteration[]`, `finalScore` |
 | qa | `iterations: QAIteration[]`, `deferredIssues: string[]` (GitHub URLs) |
 | visualQa | `viewportsTested[]`, `screenshots[]`, `issues[]`, `deferredIssues[]`, `lighthouseScores: {performance, accessibility}`, `fpsDesktop`, `fpsMobile` |
@@ -247,6 +249,11 @@ it is the only part a mockup can settle:
 For the viewport itself, produce a flat placeholder block at the correct aspect and
 position — not an illustration of the 3D scene. Skip the `css-game-art` step entirely.
 
+**Where the 3D scene art does get owned: Phase 3.5, ENV_ART.** "Not designed here" has
+historically meant "not designed anywhere": the world ended up looking however it looked once
+BUILD had the game working. ENV_ART is the phase that owns whether it looks good, and it runs
+on the built scene, where the decisions can actually be measured.
+
 Reference 3D games: `chess-3d`, `cricket-blitz`, `drift-legends`, `lumble`, `strait-runner`.
 
 **Output Artifacts**:
@@ -329,7 +336,7 @@ Reference 3D games: `chess-3d`, `cricket-blitz`, `drift-legends`, `lumble`, `str
 8. Save to state: build.branchName, build.filesCreated, build.commits
 9. Update: state.currentPhase = 'build', state.lastUpdated = now()
 10. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
-11. Transition to PARALLEL_VALIDATE phase
+11. Transition to ENV_ART phase
 ```
 
 **Guardrail Enforcement**:
@@ -337,6 +344,96 @@ Reference 3D games: `chess-3d`, `cricket-blitz`, `drift-legends`, `lumble`, `str
 - BLOCK: Changes to other games
 - CONFIRM: Changes to index.html, sitemap.xml, leaderboard/index.html
 - SAFE: New files in games/{gameSlug}/
+
+---
+
+### Phase 3.5: Environment Art Pass (Gate: blocks PARALLEL_VALIDATE)
+
+**Objective**: Make the world look like someone decided how it should look. BUILD makes the
+game work; nothing before this phase owns whether it looks good. VISUAL_DESIGN settles the UI
+and explicitly hands the 3D scene forward, and BUILD then produces scene art as a side effect
+of solving game logic, which is when palettes get invented per-prop and the lighting becomes
+whatever the first `HemisphericLight` gave.
+
+It runs **here**, after BUILD and after its `game-integration-checker` gate, for two reasons:
+the scene has to exist and render before it can be art-directed or measured, and
+**PARALLEL_VALIDATE should be judging finished art, not placeholders.** Visual QA over
+placeholder art produces findings that evaporate the moment the art lands.
+
+**Execution**:
+```
+1. Log: "Starting ENV_ART phase for {gameName}"
+2. Determine is3D: design.extractedValues.rendering === '3d'
+3. Spawn agent: game-environment-artist (opus)
+   - Input: build.branchName, the game on the local dev server,
+            visualDesign.tokens (the world palette must AGREE with the HUD palette,
+            not compete with it), visualDesign.is3D
+   - The agent loads the `game-environment-art` skill. Every number it applies comes
+     from there; it does not invent budgets or defaults.
+4. Scope by rendering mode:
+   3D  - palette into one constants module (no inline hex survives); baked AO in
+         vertex colours + a contact-shadow blob under every prop; one global
+         world-space bevel width, unseen faces deleted; one key light + hemispheric
+         ambient (warm key / cool ground) + a fake rim on heroes and interactives
+         only; 3-8 materials with one atlas each, static geometry merged and frozen;
+         fog tinted to the background; gradient sky not a flat clear colour;
+         vignette and grade as a CSS overlay over the canvas, NOT a post pass
+   2D  - a hard palette of 16-32 colours with every sprite and tile quantised to it;
+         one tile size, dual-grid autotiling, interior variants + a decoration layer;
+         3-5 parallax layers with contrast and saturation falling off toward the
+         background (the tint matters more than the motion and applies even if the
+         scene does not scroll); light baked into the art + a tint multiply, with a
+         composited light layer only if dynamic light is a mechanic; a soft ellipse
+         under every sprite that stands on the ground
+   BOTH- composition, density rhythm and focal hierarchy fixed BEFORE any asset work,
+         because it is free and it is usually most of the problem; the accent hue
+         reserved for interactive objects plus a second non-colour cue
+5. Asset production order: procedural code, then CC0 restyled to the palette, then
+   generated 2D (nano-banana is available), then generated 3D through the mandatory
+   Blender finishing pass (Blender is available at /opt/homebrew/bin/blender plus an
+   MCP server). Meshy is NOT configured in this environment; do not plan around it.
+   Every added asset gets a license record. CC0 preferred: a CC BY asset drags an
+   attribution obligation into the repo.
+6. Validate (ALL must pass, this is a gate):
+     - The four budget numbers MEASURED before and after, never asserted:
+         draw calls under 50, triangles under 50k, materials under 8,
+         texture memory (sum of w*h*4*1.33) under 32 MB
+     - 60 fps sustained at 60 seconds under CPU throttling, not just first frame
+     - Four images attached, captured at the REAL camera at real device resolution:
+         before/after, greyscale, silhouette, and a prop contact sheet if more than
+         about six props changed
+     - The 41-item critique checklist run, with every failing item named and either
+       fixed or explicitly deferred with a reason
+     - Every added asset carries a license record
+7. Commit: git commit -m "feat(game): Environment art pass for {gameName}"
+8. Save to state: environmentArt.is3D, .budgetBefore, .budgetAfter, .fps60s,
+   .images, .checklistPassed, .deferred, .assetsAdded
+9. Update: state.currentPhase = 'environment_art', state.lastUpdated = now()
+10. PERSIST state to ~/Documents/weekly-games/workflows/{state.id}.json
+11. Transition to PARALLEL_VALIDATE phase
+```
+
+**GATE: do not transition to PARALLEL_VALIDATE until `budgetAfter` is filled with measured
+numbers and `checklistPassed` is recorded.** "Looks better" with no numbers and no images means
+the pass was not run, or was run against the wrong build. A pass that changes nothing and
+explains why the art was already deliberate and on budget is a valid outcome and is better
+than churn.
+
+**Never accept a Blender render or a desktop-only screenshot as evidence.** Both lie, in
+different directions: Blender lies about lighting and colour space, desktop lies about how much
+detail survives at phone size.
+
+**Guardrail Enforcement**:
+- BLOCK: Any change that moves an interaction hitbox, collision shape or spawn point.
+  Gameplay wins over composition every time; the agent stops and reports instead.
+- BLOCK: api-client.js, auth.js, shared packages, other games. Report file and line.
+- CONFIRM: Adding any third-party asset (license must be recorded).
+- SAFE: Scene and renderer files for THIS game, its palette constants, its generated assets.
+
+**Failure routing**:
+- A budget regressed past its ceiling -> fix or revert that change; the phase is not done
+- Fix lives in a blocked file         -> record in environmentArt.deferred, do not edit
+- Scene will not render               -> that is a build problem. Return to BUILD
 
 ---
 
