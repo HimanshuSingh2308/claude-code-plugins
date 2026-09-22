@@ -1,0 +1,48 @@
+{
+  "tiers": {
+    "implement": "opus", "debug": "opus",
+    "verify": "sonnet", "review": "sonnet", "gate": "sonnet",
+    "lookup": "haiku", "explore": "haiku"
+  },
+  "agentTypes": {
+    "Explore": "lookup", "Plan": "review",
+    "*-reviewer": "review", "*-tester": "verify", "*-validator": "verify",
+    "*-builder": "implement", "*-bug-fixer": "debug", "*-artist": "implement",
+    "kg-*": "lookup", "*-extractor": "lookup", "*-updater": "lookup"
+  },
+  "keywords": {
+    "verify": ["verify", "measure", "probe", "gate", "check", "audit", "re-run"],
+    "review": ["review"],
+    "lookup": ["find", "list", "where is", "grep", "inventory"],
+    "debug": ["root cause", "diagnose", "reproduce", "why does"],
+    "implement": ["implement", "build", "write", "fix", "add"]
+  },
+  "defaultTier": "implement",
+  "override": "!model=",
+  "effort": { "default": "medium", "raiseFor": ["debug", "design"] },
+  "reads": { "wholeFileLimit": 3, "largeFileLines": 2000, "override": "!reads=off" },
+  "session": {
+    "maxCompactions": 2, "maxTurns": 2500,
+    "handoffPath": "docs/handoffs/", "override": "!cap=off"
+  },
+  "memory": {
+    "areas": {
+      "apps/web-astro/public/games/*": "games/{1}",
+      "apps/api/**": "api",
+      "apps/web-astro/src/**": "web"
+    },
+    "rulesDir": ".claude/rules",
+    "tasksDir": ".claude/memory/tasks",
+    "archiveDir": ".claude/memory/archive",
+    "kgPath": ".claude/knowledge_graph.json",
+    "indexBudgetBytes": 8192
+  },
+  "profiles": {
+    "default": ["project-manager", "superpowers", "remember", "governor"],
+    "game-art": ["+game-design", "+chrome-devtools-mcp", "+blender-local"],
+    "backend": ["+backend-dev", "+playwright"],
+    "content": ["+content-studio", "+chrome-devtools-mcp"]
+  },
+  "enforce": { "reads": false, "cap": false },
+  "harnessSkill": null
+}
