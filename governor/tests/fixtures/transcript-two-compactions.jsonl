@@ -1,0 +1,9 @@
+{"type":"user","message":{"role":"user","content":"hello"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hi"}]}}
+{"type":"assistant","isSidechain":true,"message":{"role":"assistant","content":[{"type":"text","text":"subagent"}]}}
+{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"auto"}}
+{"type":"user","isCompactSummary":true,"message":{"role":"user","content":"summary"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"after one"}]}}
+{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"after two"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"last"}]}}
