@@ -88,22 +88,38 @@ Common stdin fields, every event:
   "session_id": "abc123",
   "transcript_path": "/home/user/.claude/projects/.../transcript.jsonl",
   "cwd": "/home/user/my-project",
-  "scratchpad_dir": "/tmp/claude-1000/-home-user-my-project/abc123/scratchpad",
-  "permission_mode": "default",
-  "effort": { "level": "medium" },
-  "hook_event_name": "PreToolUse",
-  "agent_id": "agent-123",
-  "agent_type": "Explore"
+  "hook_event_name": "PreToolUse"
 }
 ```
 
 Per event, added to the above:
 
-- PreToolUse: `tool_name`, `tool_input`, `tool_use_id`
-- PostToolUse: `tool_name`, `tool_input`, `tool_use_id`, `tool_result`
-- UserPromptSubmit: `prompt`, `permission_mode`
-- SessionStart: `reason` (`startup|resume|clear|compact|fork`), `model`
-- PreCompact: `reason` (`manual|auto`)
+- PreToolUse: `tool_name`, `tool_input`, `tool_use_id`, `permission_mode`, `prompt_id`
+- PostToolUse: `tool_name`, `tool_input`, `tool_use_id`, `tool_response`
+- UserPromptSubmit: `prompt`, `prompt_id`, `permission_mode`
+- SessionStart: `source` (`startup|resume|clear|compact|fork`)
+- PreCompact: `trigger` (`manual|auto`), `custom_instructions`
+
+Measured on CLI 2.1.280 by a throwaway probe plugin that dumped hook stdin (see
+**End-to-end verification**). The keys actually delivered were, verbatim:
+
+```
+SessionStart      session_id,transcript_path,cwd,hook_event_name,source
+UserPromptSubmit  session_id,transcript_path,cwd,prompt_id,permission_mode,hook_event_name,prompt
+PreToolUse        session_id,transcript_path,cwd,prompt_id,permission_mode,hook_event_name,tool_name,tool_input,tool_use_id
+```
+
+So on this version the harness sends **no** `scratchpad_dir`, `effort`, `agent_id` or
+`agent_type`. The plugin treats all four as optional:
+
+- state and the log fall back from `scratchpad_dir` to `os.tmpdir()`, keyed by
+  `session_id`, so nothing collides and nothing is lost;
+- effort reads as `unknown` and the status line prints
+  `effort unknown (policy default medium)` rather than a false level;
+- `PreCompact` reads `trigger` first and `reason` second, so either spelling works.
+
+If a later version starts sending `scratchpad_dir` or `effort.level`, the plugin picks
+them up with no change.
 
 Stdout, exit 0, a single JSON object:
 
@@ -146,7 +162,8 @@ logs and uses the defaults. A missing knowledge graph is a skip, not an error. A
 whose `meta.schemaVersion` is not one governor knows is left untouched and logged: the
 graph stays owned by project-manager.
 
-Session state is one file per session, `<scratchpad_dir>/governor-<session_id>.json`:
+Session state is one file per session,
+`<scratchpad_dir or os.tmpdir()>/governor-<session_id>.json`:
 turns, compactions, per-file read counts, rewrites, denials, warnings, active
 overrides, cap reached, handoff written, profile, branch and areas.
 
@@ -166,6 +183,77 @@ cd governor && node --test tests/*.test.mjs
 
 The hook tests spawn the real scripts and feed them hook-input JSON on stdin, so they
 test the stdin/stdout contract above rather than internal functions.
+
+## End-to-end verification
+
+Run on 2026-09-22 against Claude Code CLI 2.1.280 (`/Users/hsingh1/.local/bin/claude`),
+in a throwaway git repo outside any project, with the plugin loaded for the session only:
+
+```bash
+E2E=<scratchpad>/governor-e2e
+mkdir -p "$E2E/.claude" && cd "$E2E" && git init -b main -q
+printf '{\n  "enforce": { "reads": false, "cap": false }\n}\n' > .claude/governor.json
+node -e 'const fs=require("fs");let s="";for(let i=1;i<=3000;i++)s+=`// line ${i}\n`;fs.writeFileSync("dummy.js",s)'
+
+claude -p --plugin-dir <repo>/governor --permission-mode bypassPermissions --model haiku \
+  'Use the Explore agent to list the files here, then read dummy.js in full four separate
+   times with the Read tool (no offset, no limit). Do not summarise between reads.'
+```
+
+Transcripts are under
+`~/.claude/projects/-private-tmp-claude-502--Users-hsingh1-a0d1f9a1-ebc0-4e00-8b12-aeb2197e921e-scratchpad-governor-e2e/`.
+
+**1. The Agent call was rewritten to the tier's model.** PASS. Session
+`a7f5dfe2-4346-4014-81a1-af3f7c0cffc3`. The assistant emitted `Agent` with
+`subagent_type: "Explore"` and no `model`; the `PreToolUse:Agent` hook returned:
+
+```json
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","updatedInput":{
+  "description":"List files in current directory",
+  "prompt":"List all files in the current working directory. ...\n\ngovernor: tier lookup -> haiku",
+  "subagent_type":"Explore","model":"haiku"}}}
+```
+
+State for that session ends `"rewrites":1`.
+
+**2. The fourth whole-file Read carried the warning, warn-only.** PASS. Same session,
+`enforce.reads: false`. The third read's hook output was
+`governor: dummy.js read 2x in full already. Prefer offset/limit.` and the fourth's was
+
+```json
+{"hookSpecificOutput":{"hookEventName":"PreToolUse",
+  "additionalContext":"governor: dummy.js read 3x in full; use offset/limit, or the KG symbols: (none indexed)"}}
+```
+
+Every Read result came back `ok`; the session's state ends `"denials":0,"warnings":2`.
+
+**3. With `enforce.reads: true` the fourth Read is denied.** PASS. Session
+`b333d24e-3a7d-4b71-959d-8dbba45fb4d3`, same repo with
+`{"enforce":{"reads":true,"cap":false}}` and a prompt asking for four reads one at a
+time. Reads 1-3 returned `ok`, the third carrying the `read 2x` warning; the fourth came
+back as an error tool result:
+
+```
+PreToolUse:Read hook error: governor: dummy.js read 3x in full; use offset/limit, or the KG symbols: (none indexed)
+```
+
+State ends `"reads":{".../dummy.js":{"full":3,"partial":0}},"denials":1,"warnings":1` -
+the file was read three times, never a fourth.
+
+### What the run also showed
+
+- **Parallel reads under-count.** In an earlier run of the same denial case the model
+  issued three Reads in one assistant message. All three `PreToolUse` hooks ran before
+  any `PostToolUse` had written the count, so they each saw zero and the denial landed on
+  the fifth call rather than the fourth (session
+  `baacbfef-418d-4fa3-93c1-dd24b354c2b9`, `"full":4,"denials":1`). The counter is a
+  read-modify-write on one JSON file and has no lock: a batch of N parallel reads of one
+  path counts as one. It never over-counts, so it never denies a read it should have
+  allowed. Sequential reads - the expensive pattern this exists to stop - count exactly.
+- **A denial reaches the model as a tool error**, prefixed `PreToolUse:Read hook error:`,
+  with the governor's reason intact. The model stopped re-reading and reported it.
+- **No `scratchpad_dir` and no `effort` on this CLI version**; see the harness contract
+  above for the probe and the fallbacks.
 
 ## Rollout
 
