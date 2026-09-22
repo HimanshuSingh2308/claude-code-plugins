@@ -62,8 +62,7 @@ test('reads with offset or limit always pass and are not counted', () => {
   assert.equal(readPre(s, f).out, '');
 });
 
-// un-skipped in Task 5, when user-prompt.mjs (which records the token) exists
-test.skip('!reads=off disables denial for the session', () => {
+test('!reads=off disables denial for the session', () => {
   const s = sandbox({ enforce: { reads: true } }); const f = bigFile(s);
   runHook('user-prompt.mjs', { ...s, hook_event_name: 'UserPromptSubmit', prompt: 'carry on !reads=off' });
   for (let i = 0; i < 3; i++) { readPre(s, f); readPost(s, f); }
