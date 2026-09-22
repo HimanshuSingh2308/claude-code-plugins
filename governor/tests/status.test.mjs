@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { sandbox, ROOT, runHook } from './helpers.mjs';
 
 function status(s) {
@@ -33,6 +34,40 @@ test('reports the session counters', () => {
   assert.equal(j.compactions, 2);
   assert.equal(j.overrides.cap, true);
   assert.equal(j.profile, 'default');
+});
+
+test('reports capReachedAt once the cap trips, null before that', () => {
+  const s = sandbox({ session: { maxTurns: 2, maxCompactions: 99 } });
+  assert.equal(status(s).json.capReachedAt, null);
+  runHook('user-prompt.mjs', {
+    ...s, hook_event_name: 'UserPromptSubmit', prompt: 'go',
+    transcript_path: join(ROOT, 'tests', 'fixtures', 'transcript-two-compactions.jsonl') });
+  const j = status(s).json;
+  assert.equal(j.capReached, true);
+  assert.ok(typeof j.capReachedAt === 'number' && j.capReachedAt > 0);
+});
+
+test('reports handoffOnDisk when a handoff file exists, independent of handoffWritten', () => {
+  const s = sandbox();
+  assert.equal(status(s).json.handoffOnDisk, null);
+  mkdirSync(join(s.cwd, 'docs/handoffs'), { recursive: true });
+  writeFileSync(join(s.cwd, 'docs/handoffs/2026-09-22-x.md'), '# Handoff');
+  const j = status(s).json;
+  assert.ok(j.handoffOnDisk && j.handoffOnDisk.endsWith('2026-09-22-x.md'));
+  assert.equal(j.handoffWritten, false, 'handoffOnDisk is a live disk check, separate from the state flag');
+});
+
+test('reports lastRepoDir once a Read or Write has recorded one', () => {
+  const s = sandbox();
+  assert.equal(status(s).json.lastRepoDir, null);
+  execFileSync('git', ['init', '-q'], { cwd: s.cwd });
+  mkdirSync(join(s.cwd, 'src'), { recursive: true });
+  writeFileSync(join(s.cwd, 'src/app.js'), 'const a = 1;');
+  runHook('post-tool-write.mjs', {
+    ...s, hook_event_name: 'PostToolUse', tool_name: 'Write',
+    tool_input: { file_path: join(s.cwd, 'src/app.js'), content: 'const a = 1;' }, tool_result: 'ok' });
+  const j = status(s).json;
+  assert.ok(j.lastRepoDir, 'lastRepoDir should be recorded');
 });
 
 test('reports orphan memories whose files are gone', () => {

@@ -10,12 +10,16 @@
 // stale scratchpad - this falls back to the newest `governor-*.json` in the
 // scratchpad directory, then the newest one in os.tmpdir(). An explicit
 // --session always wins and is used as-is, matching the pre-0.1.1 contract.
-import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join, isAbsolute, dirname, basename } from 'node:path';
+// (The self-locating logic itself lives in lib/session.mjs, shared with
+// override.mjs.)
+import { existsSync } from 'node:fs';
+import { join, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadPolicy } from './lib/policy.mjs';
 import { readState } from './lib/state.mjs';
 import { loadKg } from './lib/kg.mjs';
+import { locateSession } from './lib/session.mjs';
+import { handoffOnDisk } from './lib/paths.mjs';
 
 const a = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -26,49 +30,7 @@ const cwd = arg('cwd', process.cwd());
 const scratchpad = arg('scratchpad', undefined);
 const explicitSession = arg('session', undefined);
 
-function sessionIdFromScratchpad(dir) {
-  // layout: <root>/<session_id>/scratchpad
-  if (!dir) return undefined;
-  const id = basename(dirname(dir));
-  return id && id !== '.' && id !== '/' ? id : undefined;
-}
-
-function newestGovernorFile(dir) {
-  if (!dir) return undefined;
-  try {
-    let best, bestTime = -1;
-    for (const f of readdirSync(dir)) {
-      if (!/^governor-.+\.json$/.test(f)) continue;
-      const t = statSync(join(dir, f)).mtimeMs;
-      if (t > bestTime) { bestTime = t; best = f; }
-    }
-    return best;
-  } catch { return undefined; }
-}
-
-function idFromFilename(name) {
-  const m = name && name.match(/^governor-(.+)\.json$/);
-  return m ? m[1] : undefined;
-}
-
-let sessionId = explicitSession;
-let stateDir = scratchpad;
-let located = !!explicitSession;
-
-if (!sessionId && scratchpad) {
-  const derived = sessionIdFromScratchpad(scratchpad);
-  if (derived && existsSync(join(scratchpad, `governor-${derived}.json`))) {
-    sessionId = derived; located = true;
-  } else {
-    const newest = newestGovernorFile(scratchpad);
-    if (newest) { sessionId = idFromFilename(newest); located = true; }
-  }
-}
-if (!sessionId) {
-  const td = tmpdir();
-  const newest = newestGovernorFile(td);
-  if (newest) { sessionId = idFromFilename(newest); stateDir = td; located = true; }
-}
+const { sessionId, stateDir, located } = locateSession({ cwd, scratchpad, session: explicitSession });
 
 if (!located) {
   const looked = [scratchpad, tmpdir()].filter(Boolean).join(' and ');
@@ -91,12 +53,20 @@ const orphanMemories = ((kg && kg.memories) || []).filter((m) => {
   return Array.isArray(m.files) && m.files.some((f) => !existsSync(abs(f)));
 }).map((m) => ({ id: m.id, path: m.path, title: m.title }));
 
+// A live filesystem check, independent of state.handoffWritten: useful when
+// diagnosing exactly the bug this was added for - a handoff written by Bash
+// or before the plugin loaded, which the state file may not know about yet.
+const diskBase = state.lastRepoDir || cwd;
+const handoffOnDiskPath = handoffOnDisk(diskBase, policy.session.handoffPath, null);
+
 process.stdout.write(JSON.stringify({
   sessionId, turns: state.turns, compactions: state.compactions,
   maxTurns: policy.session.maxTurns, maxCompactions: policy.session.maxCompactions,
   profile: state.profile, effort: state.effort, effortDefault: policy.effort.default,
   rewrites: state.rewrites, denials: state.denials, warnings: state.warnings,
-  overrides: state.overrides, capReached: state.capReached, handoffWritten: state.handoffWritten,
+  overrides: state.overrides, capReached: state.capReached, capReachedAt: state.capReachedAt || null,
+  handoffWritten: state.handoffWritten, handoffOnDisk: handoffOnDiskPath,
+  lastRepoDir: state.lastRepoDir || null,
   enforce: policy.enforce, branch: state.branch, areas: state.areas,
   orphanMemories
 }, null, 2));
