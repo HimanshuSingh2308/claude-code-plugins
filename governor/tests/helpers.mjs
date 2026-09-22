@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -15,6 +15,26 @@ export function runHook(script, input) {
     throw new Error(`hook ${script} exited ${r.status}: ${r.stderr}`);
   }
   return { code: r.status, stderr: r.stderr, out, json: out ? JSON.parse(out) : null };
+}
+
+/** Same contract as runHook, but spawned asynchronously so several calls can
+ * genuinely race each other - use with Promise.all for concurrency tests. */
+export function runHookAsync(script, input) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [join(ROOT, 'scripts', script)]);
+    let out = '', err = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      out = out.trim();
+      if (code !== 0) return reject(new Error(`hook ${script} exited ${code}: ${err}`));
+      try {
+        resolve({ code, stderr: err, out, json: out ? JSON.parse(out) : null });
+      } catch (e) { reject(e); }
+    });
+    child.stdin.end(input === undefined ? '' : JSON.stringify(input));
+  });
 }
 
 export function sandbox(policy) {

@@ -7,9 +7,10 @@ await safeMain('post-tool-read', async (input) => {
   const ti = input.tool_input || {};
   if (!ti.file_path) return null;
   const partial = ti.offset !== undefined || ti.limit !== undefined;
+  if (!partial) return null;  // whole reads are counted race-safely in pre-tool-read.mjs
   updateState(input, (s) => {
     const e = s.reads[ti.file_path] || { full: 0, partial: 0 };
-    if (partial) e.partial += 1; else e.full += 1;
+    e.partial += 1;
     s.reads[ti.file_path] = e;
   });
   return null;

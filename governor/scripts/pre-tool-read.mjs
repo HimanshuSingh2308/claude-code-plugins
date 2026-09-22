@@ -3,6 +3,7 @@ import { isAbsolute, join } from 'node:path';
 import { safeMain, pre } from './lib/io.mjs';
 import { loadPolicy } from './lib/policy.mjs';
 import { readState, updateState } from './lib/state.mjs';
+import { claimRead } from './lib/reads.mjs';
 import { loadKg, symbolsFor, memoriesFor, relPath, countLines } from './lib/kg.mjs';
 
 await safeMain('pre-tool-read', async (input) => {
@@ -13,11 +14,24 @@ await safeMain('pre-tool-read', async (input) => {
   if (ti.offset !== undefined || ti.limit !== undefined) return null;  // partial reads always pass
 
   const policy = loadPolicy(input.cwd, input);
-  const state = readState(input);
-  const seen = (state.reads[path] || { full: 0 }).full;
   const limit = (policy.reads && policy.reads.wholeFileLimit) || 3;
+
+  // Race-safe: claims this read's ordinal atomically so N parallel Reads of the
+  // same path in one assistant message each get a distinct count, rather than
+  // all seeing the pre-burst count from a PostToolUse counter that hasn't run
+  // yet. See lib/reads.mjs.
+  const count = claimRead(input, path, input.tool_use_id);
+  const seen = count - 1;  // whole reads of this path strictly before this one
+
+  updateState(input, (s) => {
+    const e = s.reads[path] || { full: 0, partial: 0 };
+    e.full = Math.max(e.full, count);
+    s.reads[path] = e;
+  });
+
   if (seen < limit - 1) return null;
 
+  const state = readState(input);
   const abs = isAbsolute(path) ? path : join(input.cwd || '.', path);
   const rel = relPath(input.cwd, path);
   const kg = loadKg(input.cwd, policy);
