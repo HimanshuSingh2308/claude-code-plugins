@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { defaults } from '../scripts/lib/policy.mjs';
+import { defaults, merge } from '../scripts/lib/policy.mjs';
 import { resolveTier, replaceHarness } from '../scripts/lib/tier.mjs';
 
 const P = defaults();
@@ -29,6 +29,46 @@ test('by keyword in the first 400 characters of the prompt only', () => {
 test('unclassified falls back to the default tier, never downgraded', () => {
   assert.deepEqual(resolveTier(P, { subagent_type: 'custom', prompt: 'do the thing' }),
     { tier: 'implement', model: 'opus', override: false });
+});
+
+test('when several keyword groups match, the highest tier wins: implement over verify', () => {
+  // "verify" (rank in verify/review/gate) and "fix" (rank in implement/debug)
+  // both match; keywords is object-ordered verify, review, lookup, debug,
+  // implement, so a first-match-wins scan would have picked "verify". The
+  // priority order must win instead.
+  assert.equal(resolveTier(P, { subagent_type: 'custom', description: 'verify and fix the build' }).tier,
+    'implement');
+});
+
+test('when several keyword groups match, the highest tier wins: debug over lookup', () => {
+  assert.equal(
+    resolveTier(P, { subagent_type: 'custom', description: 'find and diagnose the root cause' }).tier,
+    'debug');
+});
+
+test('when several keyword groups match, the highest tier wins: verify over lookup', () => {
+  assert.equal(resolveTier(P, { subagent_type: 'custom', description: 'find and audit the gate' }).tier,
+    'verify');
+});
+
+test('an agentTypes glob match beats a keyword match on the same call', () => {
+  // "*-builder" -> implement by agentTypes glob; the description matches the
+  // "verify" keyword group, which must not override the glob.
+  const res = resolveTier(P, { subagent_type: 'custom-builder', description: 'verify the gate' });
+  assert.equal(res.tier, 'implement');
+  assert.equal(res.model, 'opus');
+});
+
+test('an exact agentTypes match also beats a keyword match', () => {
+  const res = resolveTier(P, { subagent_type: 'Explore', description: 'please verify the gate' });
+  assert.equal(res.tier, 'lookup');
+});
+
+test('a custom tier not in TIER_PRIORITY still resolves, ranked below the known tiers', () => {
+  const custom = merge(P, { keywords: { verify: ['verify'], triage: ['triage'] } });
+  // Both "verify" (known, ranked) and "triage" (unknown, unranked) match;
+  // the known tier wins because an unranked tier sorts last.
+  assert.equal(resolveTier(custom, { subagent_type: 'custom', description: 'triage and verify' }).tier, 'verify');
 });
 
 test('an !model= token wins over everything', () => {

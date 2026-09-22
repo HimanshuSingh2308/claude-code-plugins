@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, realpathSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { runHook, runHookAsync, sandbox, hookOut } from './helpers.mjs';
+import { readState } from '../scripts/lib/state.mjs';
 
 function bigFile(s, lines = 3000, name = 'big.js') {
   const p = join(s.cwd, name);
@@ -112,4 +114,21 @@ test('four concurrent whole reads of the same path deny exactly once, race-safe'
 
   const silent = outs.filter((o) => o.permissionDecision === undefined && !o.additionalContext);
   assert.equal(silent.length, 2, `expected exactly two silent reads (the 1st and 2nd), got ${silent.length}`);
+});
+
+test('PostToolUse:Read records lastRepoDir from the file\'s git toplevel', () => {
+  const s = sandbox();
+  execFileSync('git', ['init', '-q'], { cwd: s.cwd });
+  const f = bigFile(s, 10, 'app.js');
+  readPost(s, f);
+  // git resolves symlinks (e.g. macOS's /tmp -> /private/tmp) when reporting
+  // the toplevel, so compare against the resolved cwd, not the raw one.
+  assert.equal(readState(s).lastRepoDir, realpathSync(s.cwd));
+});
+
+test('lastRepoDir is left alone when the read is outside any repo', () => {
+  const s = sandbox();
+  const f = bigFile(s, 10, 'app.js');
+  readPost(s, f);
+  assert.equal(readState(s).lastRepoDir, null);
 });

@@ -18,6 +18,7 @@
     "implement": ["implement", "build", "write", "fix", "add"]
   },
   "defaultTier": "implement",
+  "respectExplicitModel": true,
   "override": "!model=",
   "effort": { "default": "medium", "raiseFor": ["debug", "design"] },
   "reads": { "wholeFileLimit": 3, "largeFileLines": 2000, "override": "!reads=off" },

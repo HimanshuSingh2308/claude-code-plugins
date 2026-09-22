@@ -4,6 +4,8 @@ import { safeMain, prompt as promptOut } from './lib/io.mjs';
 import { loadPolicy } from './lib/policy.mjs';
 import { readState, writeState } from './lib/state.mjs';
 import { countTranscript } from './lib/transcript.mjs';
+import { hasOverrideToken, findModelOverride } from './lib/overrides.mjs';
+import { handoffOnDisk } from './lib/paths.mjs';
 
 export function branchSlug(cwd) {
   try {
@@ -28,9 +30,9 @@ await safeMain('user-prompt', async (input) => {
   state.compactions = counts.compactions;
   state.effort = (input.effort && input.effort.level) || state.effort;
 
-  if (text.includes((policy.reads && policy.reads.override) || '!reads=off')) state.overrides.reads = true;
-  if (text.includes((policy.session && policy.session.override) || '!cap=off')) state.overrides.cap = true;
-  if (text.includes(policy.override || '!model=')) state.overrides.model = true;
+  if (hasOverrideToken(text, (policy.reads && policy.reads.override) || '!reads=off')) state.overrides.reads = true;
+  if (hasOverrideToken(text, (policy.session && policy.session.override) || '!cap=off')) state.overrides.cap = true;
+  if (findModelOverride(text, policy.override || '!model=')) state.overrides.model = true;
 
   const lines = [];
   if (state.pendingStatus) { lines.push(state.pendingStatus); state.pendingStatus = null; }
@@ -52,13 +54,23 @@ await safeMain('user-prompt', async (input) => {
   const maxComp = policy.session.maxCompactions;
   if ((state.turns >= maxTurns || state.compactions >= maxComp)
       && !state.handoffWritten && !state.overrides.cap) {
-    state.capReached = true;
-    const date = new Date().toISOString().slice(0, 10);
-    const file = `${policy.session.handoffPath}${date}-${branchSlug(input.cwd)}.md`;
-    lines.push(`governor: session cap reached (turns ${state.turns}/${maxTurns},` +
-      ` compactions ${state.compactions}/${maxComp}). Stop the current work and write the handoff` +
-      ` to ${file} from the template at ${'${CLAUDE_PLUGIN_ROOT}'}/templates/handoff.md,` +
-      ` then start a fresh session. Override with ${policy.session.override}.`);
+    if (!state.capReached) { state.capReached = true; state.capReachedAt = Date.now(); }
+
+    // A handoff can land on disk without ever going through the Write/Edit
+    // PostToolUse hook - a Bash heredoc, or a write from before the plugin
+    // loaded this session. Credit it here too, not only in the cap gate, so
+    // the status line stops asking for a handoff that already exists.
+    const baseDir = state.lastRepoDir || input.cwd;
+    if (handoffOnDisk(baseDir, policy.session.handoffPath, state.capReachedAt)) {
+      state.handoffWritten = true;
+    } else {
+      const date = new Date().toISOString().slice(0, 10);
+      const file = `${policy.session.handoffPath}${date}-${branchSlug(baseDir)}.md`;
+      lines.push(`governor: session cap reached (turns ${state.turns}/${maxTurns},` +
+        ` compactions ${state.compactions}/${maxComp}). Stop the current work and write the handoff` +
+        ` to ${file} from the template at ${'${CLAUDE_PLUGIN_ROOT}'}/templates/handoff.md,` +
+        ` then start a fresh session. Override with ${policy.session.override}.`);
+    }
   }
 
   writeState(input, state);

@@ -1,11 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runHook, sandbox, hookOut } from './helpers.mjs';
+import { readState } from '../scripts/lib/state.mjs';
 
 function call(tool_input, policy) {
+  const s = sandbox(policy);
   return runHook('pre-tool-agent.mjs', {
-    ...sandbox(policy), hook_event_name: 'PreToolUse',
+    ...s, hook_event_name: 'PreToolUse',
     tool_name: 'Agent', tool_use_id: 'toolu_1', tool_input
+  });
+}
+
+function callIn(s, tool_input) {
+  return runHook('pre-tool-agent.mjs', {
+    ...s, hook_event_name: 'PreToolUse', tool_name: 'Agent', tool_use_id: 'toolu_1', tool_input
   });
 }
 
@@ -35,6 +43,42 @@ test('the harness block is replaced even when the model already matches', () => 
   const o = hookOut(res);
   assert.ok(o.updatedInput.prompt.includes('Load the skill `tt3d-harness`'));
   assert.ok(!o.updatedInput.prompt.includes('boilerplate'));
+});
+
+test('respectExplicitModel (default true) keeps an explicit model even when the prompt' +
+  ' matches a different tier\'s keywords', () => {
+  const s = sandbox();
+  const res = callIn(s, { subagent_type: 'custom', model: 'opus', description: 'verify the gate' });
+  assert.equal(res.out, '', 'no rewrite, no output');
+  assert.equal(readState(s).rewrites, 0);
+});
+
+test('respectExplicitModel: false restores the old rewrite-to-tier behaviour', () => {
+  const s = sandbox({ respectExplicitModel: false });
+  const res = callIn(s, { subagent_type: 'custom', model: 'opus', description: 'verify the gate' });
+  const o = hookOut(res);
+  assert.equal(o.updatedInput.model, 'sonnet');
+  assert.ok(o.updatedInput.prompt.endsWith('governor: tier verify -> sonnet'));
+  assert.equal(readState(s).rewrites, 1);
+});
+
+test('respectExplicitModel does not suppress the harness-block replacement', () => {
+  const s = sandbox({ harnessSkill: 'tt3d-harness' });
+  const res = callIn(s, {
+    subagent_type: 'custom', model: 'opus', description: 'verify the gate',
+    prompt: 'go\n<!-- harness-rules -->\nboilerplate\n<!-- /harness-rules -->\nend'
+  });
+  const o = hookOut(res);
+  assert.ok(o.updatedInput.prompt.includes('Load the skill `tt3d-harness`'));
+  assert.equal(o.updatedInput.model, 'opus', 'the explicit model passes through untouched, not rewritten to sonnet');
+  assert.equal(readState(s).rewrites, 0);
+});
+
+test('an !model= override still wins even with an explicit call.model set', () => {
+  const s = sandbox();
+  const res = callIn(s, {
+    subagent_type: 'custom', model: 'opus', description: 'verify the gate', prompt: 'go !model=haiku' });
+  assert.equal(res.out, '', 'the override IS the explicit model already - nothing to rewrite');
 });
 
 test('a non Agent tool is ignored', () => {

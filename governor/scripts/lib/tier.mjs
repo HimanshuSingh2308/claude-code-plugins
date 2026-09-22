@@ -1,19 +1,31 @@
 import { matchGlob } from './glob.mjs';
+import { findModelOverride } from './overrides.mjs';
 
 export const HARNESS_OPEN = '<!-- harness-rules -->';
 export const HARNESS_CLOSE = '<!-- /harness-rules -->';
 const PROMPT_SCAN = 400;
 
+/** Highest tier wins when several keyword groups match the same text: writing
+ * and root-causing code outrank checking it, which outranks finding it. A
+ * tier absent from this list (a project's custom keyword group) ranks last. */
+export const TIER_PRIORITY = ['implement', 'debug', 'verify', 'review', 'gate', 'lookup', 'explore'];
+
 export function findOverride(policy, text) {
-  const token = String(policy.override || '!model=').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = new RegExp(token + '([A-Za-z0-9._\\-]+)').exec(text || '');
-  return m ? m[1] : null;
+  return findModelOverride(text, policy.override || '!model=');
+}
+
+function tierRank(t) {
+  const i = TIER_PRIORITY.indexOf(t);
+  return i === -1 ? TIER_PRIORITY.length : i;
 }
 
 /**
  * Resolution order (spec section 1): subagent_type against agentTypes (exact, then
- * glob), then the first keyword group matching the description or the first 400
- * characters of the prompt, then defaultTier. An !model= token wins over everything.
+ * glob) - which always beats keywords - then the highest-priority keyword group
+ * matching the description or the first 400 characters of the prompt (see
+ * TIER_PRIORITY: several groups can match the same text, and implement/debug
+ * must win over verify/review/gate, which must win over lookup/explore), then
+ * defaultTier. An !model= token wins over everything.
  */
 export function resolveTier(policy, call) {
   const type = call.subagent_type || '';
@@ -30,9 +42,12 @@ export function resolveTier(policy, call) {
     }
   }
   if (!tier) {
+    let best = null;
     for (const [t, words] of Object.entries(policy.keywords || {})) {
-      if ((words || []).some((w) => haystack.includes(String(w).toLowerCase()))) { tier = t; break; }
+      if (!(words || []).some((w) => haystack.includes(String(w).toLowerCase()))) continue;
+      if (best === null || tierRank(t) < tierRank(best)) best = t;
     }
+    tier = best;
   }
   if (!tier) tier = policy.defaultTier || 'implement';
 

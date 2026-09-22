@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { safeMain } from './lib/io.mjs';
 import { loadPolicy } from './lib/policy.mjs';
 import { updateState } from './lib/state.mjs';
-import { isUnderHandoff } from './lib/paths.mjs';
+import { isUnderHandoff, repoDirFor } from './lib/paths.mjs';
 import { loadKg, appendMemory, relPath } from './lib/kg.mjs';
 import { extractRefs, isMemoryPath, titleOf, memoryId } from './lib/extract.mjs';
 
@@ -12,7 +12,10 @@ await safeMain('post-tool-write', async (input) => {
   const ti = input.tool_input || {};
   const policy = loadPolicy(input.cwd, input);
 
-  if (isUnderHandoff(ti.file_path, policy.session.handoffPath, input.cwd)) {
+  const repoDir = repoDirFor(input.cwd, ti.file_path);
+  if (repoDir) updateState(input, (s) => { s.lastRepoDir = repoDir; });
+
+  if (isUnderHandoff(ti.file_path, policy.session.handoffPath)) {
     updateState(input, (s) => { s.handoffWritten = true; });
   }
 

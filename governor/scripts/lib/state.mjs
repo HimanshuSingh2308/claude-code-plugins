@@ -13,8 +13,8 @@ export function freshState(input) {
     turns: 0, compactions: 0, reads: {},
     rewrites: 0, denials: 0, warnings: 0,
     overrides: { model: false, reads: false, cap: false },
-    capReached: false, handoffWritten: false,
-    profile: 'default', baselinePlugins: null,
+    capReached: false, capReachedAt: null, handoffWritten: false,
+    profile: 'default', baselinePlugins: null, lastRepoDir: null,
     effort: null, branch: null, areas: [], pendingStatus: null
   };
 }

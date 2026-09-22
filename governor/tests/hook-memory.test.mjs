@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { runHook, sandbox } from './helpers.mjs';
+import { readState } from '../scripts/lib/state.mjs';
 
 function withKg() {
   const s = sandbox();
@@ -55,4 +57,23 @@ test('rewriting the same memory replaces its entry', () => {
   const m = kgOf(s).memories;
   assert.equal(m.length, 1);
   assert.equal(m[0].title, 'Two');
+});
+
+test('PostToolUse:Write records lastRepoDir from the written file\'s git toplevel', () => {
+  const s = sandbox();
+  execFileSync('git', ['init', '-q'], { cwd: s.cwd });
+  mkdirSync(join(s.cwd, 'src'), { recursive: true });
+  write(s, 'src/app.js', 'const a = 1;');
+  assert.equal(readState(s).lastRepoDir, realpathSync(s.cwd));
+});
+
+test('a Write or Edit whose path is under handoffPath is credited regardless of cwd', () => {
+  const s = sandbox();
+  mkdirSync(join(s.cwd, 'docs/handoffs'), { recursive: true });
+  const target = join(s.cwd, 'docs/handoffs/2026-09-22-x.md');
+  writeFileSync(target, '# Handoff');
+  runHook('post-tool-write.mjs', {
+    ...s, hook_event_name: 'PostToolUse', tool_name: 'Write',
+    tool_input: { file_path: target, content: '# Handoff' }, tool_result: 'ok' });
+  assert.equal(readState(s).handoffWritten, true);
 });

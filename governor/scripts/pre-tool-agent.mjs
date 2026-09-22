@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { safeMain, pre } from './lib/io.mjs';
+import { safeMain, pre, log } from './lib/io.mjs';
 import { loadPolicy } from './lib/policy.mjs';
 import { updateState } from './lib/state.mjs';
 import { resolveTier, replaceHarness } from './lib/tier.mjs';
@@ -12,7 +12,18 @@ await safeMain('pre-tool-agent', async (input) => {
 
   const newPrompt = replaceHarness(call.prompt, policy);
   const harnessChanged = newPrompt !== call.prompt;
-  const rewriteModel = !override && !!model && call.model !== model;
+  const explicitModel = typeof call.model === 'string' && call.model.length > 0;
+  const respectExplicit = policy.respectExplicitModel !== false;
+
+  let rewriteModel = !override && !!model && call.model !== model;
+  if (rewriteModel && respectExplicit && explicitModel) {
+    // The cost lever: a dispatcher that already picked a model (e.g. an
+    // explicit "opus" on a call whose prompt happens to match a lower tier's
+    // keywords) keeps it. Set respectExplicitModel: false to force tier
+    // models even over an explicit one.
+    rewriteModel = false;
+    log(`explicit model kept: ${call.model} (tier ${tier} would have used ${model})`, input);
+  }
   if (!rewriteModel && !harnessChanged) return null;
 
   const updatedInput = { ...call };

@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 import { safeMain } from './lib/io.mjs';
 import { updateState } from './lib/state.mjs';
+import { repoDirFor } from './lib/paths.mjs';
 
 await safeMain('post-tool-read', async (input) => {
   if (input.tool_name !== 'Read') return null;
   const ti = input.tool_input || {};
   if (!ti.file_path) return null;
+
+  const repoDir = repoDirFor(input.cwd, ti.file_path);
+  if (repoDir) updateState(input, (s) => { s.lastRepoDir = repoDir; });
+
   const partial = ti.offset !== undefined || ti.limit !== undefined;
   if (!partial) return null;  // whole reads are counted race-safely in pre-tool-read.mjs
   updateState(input, (s) => {

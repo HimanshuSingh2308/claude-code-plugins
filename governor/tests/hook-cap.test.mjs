@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { runHook, sandbox, hookOut, ROOT } from './helpers.mjs';
+import { readState } from '../scripts/lib/state.mjs';
 
 const FIXTURE = join(ROOT, 'tests', 'fixtures', 'transcript-two-compactions.jsonl');
 const CAPPED = { session: { maxTurns: 2 }, enforce: { cap: true } };
@@ -99,4 +103,57 @@ test('!cap=off lifts the gate', () => {
   runHook('user-prompt.mjs', {
     ...s, hook_event_name: 'UserPromptSubmit', prompt: 'go !cap=off', transcript_path: FIXTURE });
   assert.equal(gate(s, 'Bash', { command: 'npm test' }).out, '');
+});
+
+test('cap=off (no bang) also lifts the gate - the bang is Claude Code\'s shell shortcut', () => {
+  const s = sandbox(CAPPED);
+  runHook('user-prompt.mjs', {
+    ...s, hook_event_name: 'UserPromptSubmit', prompt: 'governor cap=off', transcript_path: FIXTURE });
+  assert.equal(gate(s, 'Bash', { command: 'npm test' }).out, '');
+});
+
+test('a handoff already on disk - written by Bash before the plugin loaded - lifts the gate' +
+  ' without any Write/Edit hook ever firing', () => {
+  const s = sandbox(CAPPED); trip(s);
+  assert.equal(hookOut(gate(s, 'Bash', { command: 'npm test' })).permissionDecision, 'deny');
+
+  // The state file never saw a Write/Edit PostToolUse for this file - it was
+  // written straight to disk (a heredoc), so state.handoffWritten is still false.
+  mkdirSync(join(s.cwd, 'docs/handoffs'), { recursive: true });
+  writeFileSync(join(s.cwd, 'docs/handoffs/2026-09-22-preview-tt3d-all.md'), '# Handoff');
+
+  assert.equal(gate(s, 'Bash', { command: 'npm test' }).out, '');
+  assert.equal(readState(s).handoffWritten, true, 'the gate also persists the credit to state');
+});
+
+test('a stale handoff from before the cap tripped is not credited by the disk scan', () => {
+  // The cap-gate disk scan only credits a handoff newer than capReachedAt, so
+  // an old leftover file from a past session near the handoff dir does not
+  // silently lift the gate for an unrelated one.
+  const s = sandbox(CAPPED);
+  mkdirSync(join(s.cwd, 'docs/handoffs'), { recursive: true });
+  const old = join(s.cwd, 'docs/handoffs/2026-09-01-stale.md');
+  writeFileSync(old, '# Stale');
+  const past = new Date(Date.now() - 3600_000);
+  execFileSync('touch', ['-t', pastStamp(past), old]);
+
+  trip(s);
+  const o = hookOut(gate(s, 'Bash', { command: 'npm test' }));
+  assert.equal(o.permissionDecision, 'deny');
+});
+
+function pastStamp(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${String(d.getFullYear()).slice(2)}${p(d.getMonth() + 1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+test('an Edit whose absolute path is under handoffPath passes even when the session cwd drifted' +
+  ' to an unrelated directory', () => {
+  const s = sandbox(CAPPED); trip(s);
+  const otherRepo = mkdtempSync(join(tmpdir(), 'gov-other-repo-'));
+  const realFile = join(otherRepo, 'docs/handoffs/2026-09-22-no-branch.md');
+  // s.cwd (the hook's stdin cwd) is unrelated to otherRepo - simulating the
+  // drifted cwd (e.g. ~/.claude-shared/projects/.../memory) while the actual
+  // edit targets a file inside the real worktree.
+  assert.equal(gate(s, 'Edit', { file_path: realFile }).out, '');
 });

@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runHook, sandbox, hookOut, ROOT } from './helpers.mjs';
+import { readState } from '../scripts/lib/state.mjs';
 
 const FIXTURE = join(ROOT, 'tests', 'fixtures', 'transcript-two-compactions.jsonl');
 
@@ -53,6 +55,44 @@ test('!cap=off suppresses the handoff instruction', () => {
   submit(s, 'noted !cap=off');
   assert.ok(!hookOut(submit(s, 'keep going', { transcript_path: FIXTURE }))
     .additionalContext.includes('write the handoff'));
+});
+
+test('cap=off without the bang also suppresses the handoff instruction', () => {
+  const s = sandbox({ session: { maxTurns: 2 } });
+  submit(s, 'governor cap=off');
+  assert.ok(!hookOut(submit(s, 'keep going', { transcript_path: FIXTURE }))
+    .additionalContext.includes('write the handoff'));
+});
+
+test('model= inside code is not mistaken for an override', () => {
+  const s = sandbox();
+  const o = hookOut(submit(s, 'the config has retryModel=opus in it'));
+  assert.ok(!o.additionalContext.includes('overrides:'));
+});
+
+test('the cap trip records capReachedAt', () => {
+  const s = sandbox({ session: { maxTurns: 2, maxCompactions: 99 } });
+  submit(s, 'keep going', { transcript_path: FIXTURE });
+  const st = readState(s);
+  assert.equal(st.capReached, true);
+  assert.ok(typeof st.capReachedAt === 'number' && st.capReachedAt > 0);
+});
+
+test('a handoff written to disk (e.g. a Bash heredoc) after the cap trips is credited on the' +
+  ' next prompt - no more "write the handoff" line', () => {
+  const s = sandbox({ session: { maxTurns: 2, maxCompactions: 99 } });
+  const first = hookOut(submit(s, 'keep going', { transcript_path: FIXTURE }));
+  assert.ok(first.additionalContext.includes('write the handoff'));
+
+  // Written straight to disk, never through the Write/Edit PostToolUse hook -
+  // and after capReachedAt, so the recency filter does not reject it as a
+  // stale leftover from an unrelated past session.
+  mkdirSync(join(s.cwd, 'docs/handoffs'), { recursive: true });
+  writeFileSync(join(s.cwd, 'docs/handoffs/2026-09-22-preview-tt3d-all.md'), '# Handoff');
+
+  const o = hookOut(submit(s, 'keep going', { transcript_path: FIXTURE }));
+  assert.ok(!o.additionalContext.includes('write the handoff'), o.additionalContext);
+  assert.equal(readState(s).handoffWritten, true);
 });
 
 test('a broken transcript path still returns a status line', () => {
