@@ -47,8 +47,8 @@ every prompt.
 - The third whole-file read of one path is allowed with a warning that names the
   file's symbols from `knowledge_graph.json` and any memories attached to it.
 - The fourth whole-file read of a file longer than `reads.largeFileLines` is denied
-  with the symbols in the reason — but only when `enforce.reads` is true. In 0.1.0 it
-  is false, so the fourth read warns instead.
+  with the symbols in the reason — but only when `enforce.reads` is true. It ships
+  false, so the fourth read warns instead unless a project turns it on.
 - A file under `largeFileLines` is never denied, however often it is read.
 
 When you get the warning, the answer is a targeted read: `offset`/`limit` around the
@@ -62,9 +62,15 @@ denials. When turns reach `session.maxTurns` or compactions reach
 `session.maxCompactions`, the cap trips: the session must write a handoff to
 `<handoffPath><yyyy-mm-dd>-<branch-slug>.md` and continue in a fresh session.
 
-While the cap holds and `enforce.cap` is true, only these pass: Read, Glob, Grep;
-Write or Edit under `handoffPath`; Bash starting with `git status`, `git diff`,
-`git log`, `git add`, `git commit`. Everything else is denied with the reason.
+`enforce.cap` is true by default since 0.1.1. While the cap holds and `enforce.cap`
+is true, only these pass: Read, Glob, Grep; Write or Edit under `handoffPath`; Bash
+starting with `git status`, `git diff`, `git log`, `git add`, `git commit`.
+Everything else is denied with the reason - the gate only starts denying once the
+cap-reached status line has been shown once, on the prompt where turns or
+compactions first cross their limit, so it is never a surprise on the very first
+tool call after upgrading into a session that was already over the cap.
+`!cap=off` for the session, or `"enforce": {"cap": false}` in a project's
+`.claude/governor.json`, turns it back off.
 
 A handoff says what is done, what is not, which files matter and why, the next
 concrete step, and the traps found. It is not a summary of the conversation.

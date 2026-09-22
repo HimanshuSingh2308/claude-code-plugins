@@ -8,7 +8,7 @@ knowledge graph.
 Nothing in the plugin names a project, a game or a user. A project opts in by having
 `.claude/governor.json`; a project without one gets `policy/default.json`.
 
-Version 0.1.0. Node 24, no npm dependencies.
+Version 0.1.1. Node 24, no npm dependencies.
 
 ## Install
 
@@ -54,8 +54,8 @@ Then reload plugins (`/reload-plugins`) or restart the session.
 | `memory.kgPath` | `.claude/knowledge_graph.json` | the graph governor appends to |
 | `memory.indexBudgetBytes` | `8192` | MEMORY.md index budget |
 | `profiles` | default + game-art, backend, content | plugin sets for `/governor profile` |
-| `enforce.reads` | `false` | **0.1.0 ships warn-only**; true turns the fourth read into a denial |
-| `enforce.cap` | `false` | **0.1.0 ships warn-only**; true turns the cap into a gate |
+| `enforce.reads` | `false` | **still warn-only in 0.1.1**; true turns the fourth read into a denial |
+| `enforce.cap` | `true` | **enforced by default since 0.1.1**; the cap gate denies non-allowlisted tools once reached. `!cap=off` for the session, or a project `.claude/governor.json` with `"enforce": {"cap": false}`, turns it back off |
 | `harnessSkill` | `null` | skill named in place of a `<!-- harness-rules -->` block |
 
 The Agent model rewrite is always on; it is not behind an `enforce` switch.
@@ -101,7 +101,8 @@ Per event, added to the above:
 - PreCompact: `trigger` (`manual|auto`), `custom_instructions`
 
 Measured on CLI 2.1.280 by a throwaway probe plugin that dumped hook stdin (see
-**End-to-end verification**). The keys actually delivered were, verbatim:
+**End-to-end verification**), under `claude -p`. The keys actually delivered there
+were, verbatim:
 
 ```
 SessionStart      session_id,transcript_path,cwd,hook_event_name,source
@@ -109,17 +110,39 @@ UserPromptSubmit  session_id,transcript_path,cwd,prompt_id,permission_mode,hook_
 PreToolUse        session_id,transcript_path,cwd,prompt_id,permission_mode,hook_event_name,tool_name,tool_input,tool_use_id
 ```
 
-So on this version the harness sends **no** `scratchpad_dir`, `effort`, `agent_id` or
-`agent_type`. The plugin treats all four as optional:
+So under `claude -p` the harness sends **no** `scratchpad_dir`. A live interactive
+session on the same CLI version was measured separately (2026-09-22) and does send
+it: hook stdin there carried `scratchpad_dir`, and the state file landed at
+`<scratchpad_dir>/governor-<session_id>.json`, for example
+`/private/tmp/claude-502/-Users-hsingh1/<session_id>/scratchpad/governor-<session_id>.json` -
+that is, `<root>/<session_id>/scratchpad`, the layout `status.mjs` relies on to
+derive the session id when it is not passed one (see **Commands**).
 
-- state and the log fall back from `scratchpad_dir` to `os.tmpdir()`, keyed by
-  `session_id`, so nothing collides and nothing is lost;
+Neither delivery sends `effort`, `agent_id` or `agent_type`. The plugin treats
+`scratchpad_dir` and these three as optional:
+
+- state and the log fall back from `scratchpad_dir` to `os.tmpdir()` when it is
+  absent (`claude -p`), keyed by `session_id`, so nothing collides and nothing
+  is lost; when it is present (interactive), state lands under the scratchpad
+  as measured above;
 - effort reads as `unknown` and the status line prints
   `effort unknown (policy default medium)` rather than a false level;
 - `PreCompact` reads `trigger` first and `reason` second, so either spelling works.
 
-If a later version starts sending `scratchpad_dir` or `effort.level`, the plugin picks
-them up with no change.
+If a later version starts sending `effort.level`, the plugin picks it up with no
+change.
+
+**The version that actually runs is the plugin cache copy**,
+`~/.claude/plugins/cache/hplugins/governor/<version>/`, not this repository. After
+pushing a change here, pick it up with:
+
+```
+/plugin marketplace update hplugins
+```
+
+then reinstall the plugin or run `/reload-plugins` - the cache is not refreshed
+otherwise, and a session started before that will keep running the old version's
+hooks for its lifetime.
 
 Stdout, exit 0, a single JSON object:
 
@@ -170,6 +193,16 @@ overrides, cap reached, handoff written, profile, branch and areas.
 ## Commands
 
 `/governor status | profile <name|off> | memory fold | task fold [branch] | handoff`
+
+`status` is self-locating: `status.mjs` takes `--cwd` and `--scratchpad`, not a
+session id. When `--session` is not given it derives the session id from the
+scratchpad path's parent directory name (`<root>/<session_id>/scratchpad`, the
+interactive-session layout above); failing that, it uses the newest
+`governor-*.json` in the scratchpad directory, then the newest one in
+`os.tmpdir()`. If none of that finds a state file, it prints a plain
+`governor: no session state file found ...` line instead of a JSON zero state,
+so a missing file is never mistaken for a session that has genuinely done
+nothing yet.
 
 The folds are propose-then-apply. `fold.mjs` prints a JSON plan and moves nothing;
 only `--apply --approved <plan.json>` acts, and `--apply` alone exits non-zero. The
@@ -242,24 +275,32 @@ the file was read three times, never a fourth.
 
 ### What the run also showed
 
-- **Parallel reads under-count.** In an earlier run of the same denial case the model
-  issued three Reads in one assistant message. All three `PreToolUse` hooks ran before
-  any `PostToolUse` had written the count, so they each saw zero and the denial landed on
-  the fifth call rather than the fourth (session
-  `baacbfef-418d-4fa3-93c1-dd24b354c2b9`, `"full":4,"denials":1`). The counter is a
-  read-modify-write on one JSON file and has no lock: a batch of N parallel reads of one
-  path counts as one. It never over-counts, so it never denies a read it should have
-  allowed. Sequential reads - the expensive pattern this exists to stop - count exactly.
+- **Parallel reads under-counted before 0.1.1, fixed since.** In an earlier run of the
+  same denial case the model issued three Reads in one assistant message. All three
+  `PreToolUse` hooks ran before any `PostToolUse` had written the count, so they each
+  saw zero and the denial landed on the fifth call rather than the fourth (session
+  `baacbfef-418d-4fa3-93c1-dd24b354c2b9`, `"full":4,"denials":1`). The counter was a
+  read-modify-write on one JSON file with no lock: a batch of N parallel reads of one
+  path counted as one. It never over-counted, so it never denied a read it should have
+  allowed, but it under-counted. Since 0.1.1, `pre-tool-read.mjs` claims each whole
+  read's ordinal race-safely at `PreToolUse` time itself (see `scripts/lib/reads.mjs`
+  and `tests/hook-read.test.mjs`'s concurrent-Reads test), so a batch of N parallel
+  reads of one path counts as N, the same as N sequential reads.
 - **A denial reaches the model as a tool error**, prefixed `PreToolUse:Read hook error:`,
   with the governor's reason intact. The model stopped re-reading and reported it.
-- **No `scratchpad_dir` and no `effort` on this CLI version**; see the harness contract
-  above for the probe and the fallbacks.
+- **`scratchpad_dir` and `effort` under `claude -p`**; see the harness contract
+  above for the probe, what an interactive session sends instead, and the fallbacks.
 
 ## Rollout
 
-- 0.1.0 (this version): the Agent rewrite, the budget and status, SessionStart and
-  PreCompact, the read counter in warn-only mode, `status`, the harness skill marker,
-  the fold engine and the memory indexer. `enforce.reads` and `enforce.cap` ship false.
-- 0.2.0: turn on read denial and the cap.
+- 0.1.0: the Agent rewrite, the budget and status, SessionStart and PreCompact, the
+  read counter in warn-only mode, `status`, the harness skill marker, the fold engine
+  and the memory indexer. `enforce.reads` and `enforce.cap` ship false.
+- 0.1.1 (this version): `status` is self-locating from `--scratchpad` instead of
+  needing `--session`; the whole-file read counter is race-safe against parallel
+  Reads; the harness contract records that interactive sessions do send
+  `scratchpad_dir` (only `claude -p` does not). `enforce.cap` turns on by default -
+  the cap is now a real gate, not warn-only. `enforce.reads` still ships false.
+- 0.2.0: turn on read denial by default too.
 - 0.3.0: run the folds for real, once the alias table is approved.
 - 0.4.0: profiles, once the runtime reload is proven.

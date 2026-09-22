@@ -1,7 +1,7 @@
 {
   "name": "governor",
   "description": "Turns cost rules into hooks: subagent model tiers, whole-file read limits, a turn and compaction budget with a handoff cap, and scoped memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": { "name": "Himanshu Singh", "url": "https://github.com/HimanshuSingh2308" },
   "repository": "https://github.com/HimanshuSingh2308/claude-code-plugins",
   "license": "MIT",
