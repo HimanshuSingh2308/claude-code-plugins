@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sandbox, ROOT, runHook } from './helpers.mjs';
 
@@ -9,6 +10,17 @@ function status(s) {
   const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'status.mjs'),
     '--cwd', s.cwd, '--session', s.session_id, '--scratchpad', s.scratchpad_dir], { encoding: 'utf8' });
   return { code: r.status, err: r.stderr, json: JSON.parse(r.stdout) };
+}
+
+// Self-locating: no --session, only what the command text can hand status.mjs
+// - --cwd and --scratchpad. Optionally overrides the child's TMPDIR so the
+// os.tmpdir() fallback is exercised against a directory this test controls,
+// not whatever the real machine's temp dir happens to hold.
+function statusSelfLocating(cwd, scratchpad, { tmpdirOverride } = {}) {
+  const args = [join(ROOT, 'scripts', 'status.mjs'), '--cwd', cwd];
+  if (scratchpad) args.push('--scratchpad', scratchpad);
+  const env = tmpdirOverride ? { ...process.env, TMPDIR: tmpdirOverride } : process.env;
+  return spawnSync(process.execPath, args, { encoding: 'utf8', env });
 }
 
 test('reports the session counters', () => {
@@ -43,4 +55,57 @@ test('a session with no state still reports zeros', () => {
   const j = status(sandbox()).json;
   assert.equal(j.turns, 0);
   assert.deepEqual(j.orphanMemories, []);
+});
+
+test('self-locating: derives the session id from the scratchpad path\'s parent directory', () => {
+  // Interactive-session layout measured on CLI 2.1.280: <root>/<session_id>/scratchpad.
+  const cwd = mkdtempSync(join(tmpdir(), 'gov-cwd-'));
+  const root = mkdtempSync(join(tmpdir(), 'gov-root-'));
+  const sessionId = 'a0d1f9a1-ebc0-4e00-8b12-aeb2197e921e';
+  const scratchpad = join(root, sessionId, 'scratchpad');
+  mkdirSync(scratchpad, { recursive: true });
+
+  runHook('user-prompt.mjs', {
+    cwd, session_id: sessionId, scratchpad_dir: scratchpad,
+    hook_event_name: 'UserPromptSubmit', prompt: 'go',
+    transcript_path: join(ROOT, 'tests', 'fixtures', 'transcript-two-compactions.jsonl') });
+
+  // Only --cwd and --scratchpad: what commands/governor.md now passes, no --session.
+  const r = statusSelfLocating(cwd, scratchpad);
+  assert.equal(r.status, 0, r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.sessionId, sessionId);
+  assert.equal(j.turns, 4);
+  assert.equal(j.compactions, 2);
+});
+
+test('self-locating: falls back to the newest governor-*.json in the scratchpad dir', () => {
+  // A scratchpad directory that does not follow the <root>/<session_id>/scratchpad
+  // shape, so deriving the id from its parent directory name will not match any
+  // real state file. status.mjs should still find the (only) state file present.
+  const cwd = mkdtempSync(join(tmpdir(), 'gov-cwd-'));
+  const scratchpad = mkdtempSync(join(tmpdir(), 'gov-oddly-shaped-'));
+  const sessionId = 'unrelated-session-id';
+
+  runHook('user-prompt.mjs', {
+    cwd, session_id: sessionId, scratchpad_dir: scratchpad,
+    hook_event_name: 'UserPromptSubmit', prompt: 'go',
+    transcript_path: join(ROOT, 'tests', 'fixtures', 'transcript-two-compactions.jsonl') });
+
+  const r = statusSelfLocating(cwd, scratchpad);
+  assert.equal(r.status, 0, r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.sessionId, sessionId);
+  assert.equal(j.turns, 4);
+});
+
+test('self-locating: prints a clear line instead of a zero state when nothing is found', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'gov-cwd-'));
+  const emptyScratchpad = mkdtempSync(join(tmpdir(), 'gov-empty-scratch-'));
+  const emptyTmp = mkdtempSync(join(tmpdir(), 'gov-empty-tmp-'));
+
+  const r = statusSelfLocating(cwd, emptyScratchpad, { tmpdirOverride: emptyTmp });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.stdout.includes('no session state file found'), r.stdout);
+  assert.throws(() => JSON.parse(r.stdout), 'the no-state line is not JSON, so a caller cannot mistake it for real zeros');
 });

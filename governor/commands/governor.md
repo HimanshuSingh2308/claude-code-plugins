@@ -16,19 +16,33 @@ Policy comes from `.claude/governor.json` in the project, merged over
 
 ## status
 
-Run:
+Run, passing the scratchpad directory named in your own system prompt
+(`Scratchpad directory: ...`) - status.mjs is self-locating from it and does
+not need you to know the session id:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs" --cwd "$(pwd)"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs" --cwd "$(pwd)" --scratchpad "<scratchpad directory>"
 ```
 
-Report, in one short block: turns and compactions against their caps, profile,
-effort against the policy default, rewrites, denials, warnings, which overrides
-are active (`!model=`, `!reads=off`, `!cap=off`), whether the cap is reached and
-the handoff written, which enforcement switches are on, and any orphan memories
-(memories in the knowledge graph whose file or referenced files no longer exist).
+If your system prompt has no scratchpad directory (for example under `claude -p`),
+omit `--scratchpad`; status.mjs then falls back to the newest state file in
+`os.tmpdir()`. If you already know the session id, pass `--session <id>` instead
+and it is used as-is.
 
-If `enforce.reads` or `enforce.cap` is false, say so: those are warn-only in 0.1.0.
+If the output is a JSON object, report, in one short block: turns and compactions
+against their caps, profile, effort against the policy default, rewrites, denials,
+warnings, which overrides are active (`!model=`, `!reads=off`, `!cap=off`), whether
+the cap is reached and the handoff written, which enforcement switches are on, and
+any orphan memories (memories in the knowledge graph whose file or referenced files
+no longer exist).
+
+If the output is instead a single `governor: no session state file found ...` line,
+say so plainly - do not report it as a zero state, that line means status.mjs could
+not locate a state file at all, not that the session has done nothing.
+
+`enforce.cap` is true by default since 0.1.1 (`enforce.reads` still ships false,
+warn-only). If either is false, say so and name the reason if one is evident (a
+project's `.claude/governor.json`, or the `!cap=off` / `!reads=off` override).
 
 ## profile <name|off>
 
