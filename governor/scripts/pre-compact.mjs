@@ -9,7 +9,7 @@ await safeMain('pre-compact', async (input) => {
   state.turns = counts.turns;
   state.compactions = counts.compactions;
   state.pendingStatus =
-    `governor: before compaction (${input.reason || 'auto'}) - turns ${state.turns}` +
+    `governor: before compaction (${input.trigger || input.reason || 'auto'}) - turns ${state.turns}` +
     ` | compactions ${state.compactions} | profile ${state.profile}` +
     ` | rewrites ${state.rewrites} | denials ${state.denials}` +
     (state.branch ? ` | branch ${state.branch}` : '');

@@ -57,6 +57,15 @@ test('PreCompact stores the status for the next turn', () => {
   assert.ok(o.additionalContext.includes('before compaction'));
 });
 
+test('PreCompact reads the harness field trigger, with reason as a fallback', () => {
+  const s = sandbox();
+  runHook('pre-compact.mjs', {
+    ...s, hook_event_name: 'PreCompact', trigger: 'manual', transcript_path: FIXTURE });
+  const o = hookOut(runHook('user-prompt.mjs', {
+    ...s, hook_event_name: 'UserPromptSubmit', prompt: 'next' }));
+  assert.ok(o.additionalContext.includes('before compaction (manual)'), o.additionalContext);
+});
+
 test('the pending status is surfaced once, not every turn', () => {
   const s = sandbox();
   runHook('pre-compact.mjs', { ...s, hook_event_name: 'PreCompact', reason: 'auto', transcript_path: FIXTURE });
