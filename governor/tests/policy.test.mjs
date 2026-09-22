@@ -17,7 +17,7 @@ test('no project file yields defaults', () => {
   assert.equal(p.tiers.explore, 'haiku');
   assert.equal(p.defaultTier, 'implement');
   assert.equal(p.enforce.reads, false);
-  assert.equal(p.enforce.cap, false);
+  assert.equal(p.enforce.cap, true);
 });
 
 test('a three line project file merges over defaults', () => {

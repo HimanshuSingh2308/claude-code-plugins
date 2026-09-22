@@ -46,9 +46,44 @@ test('git push is still denied after the cap', () => {
   assert.equal(hookOut(gate(s, 'Bash', { command: 'git push' })).permissionDecision, 'deny');
 });
 
-test('warn-only is the default: enforce.cap false never denies', () => {
+test('enforce.cap is true by default since 0.1.1: no explicit policy still denies after the cap', () => {
   const s = sandbox({ session: { maxTurns: 2 } }); trip(s);
+  const o = hookOut(gate(s, 'Bash', { command: 'npm test' }));
+  assert.equal(o.permissionDecision, 'deny');
+  assert.ok(o.permissionDecisionReason.includes('handoff'));
+});
+
+test('enforce.cap: false in a project policy still disables the gate', () => {
+  const s = sandbox({ session: { maxTurns: 2 }, enforce: { cap: false } }); trip(s);
   assert.equal(gate(s, 'Bash', { command: 'npm test' }).out, '');
+});
+
+test('a session already over the cap before install is not gated until the handoff prompt has fired once', () => {
+  // Simulates upgrading to 0.1.1 mid-session: the transcript already has 2
+  // compactions (>= the default maxCompactions), so the cap condition is true
+  // as soon as any UserPromptSubmit is processed under the new default. Until
+  // that happens, capReached is still false (there is no session state yet)
+  // and tool calls must not be silently blocked.
+  const s = sandbox();  // no policy file: pure default.json, enforce.cap true
+
+  // Before any UserPromptSubmit event, state.capReached is false: not gated.
+  assert.equal(gate(s, 'Bash', { command: 'npm test' }).out, '');
+
+  // The qualifying UserPromptSubmit: turns/compactions already over the cap,
+  // so this is the one that shows the handoff prompt and flips capReached.
+  const trippedOut = trip(s).out;
+  assert.ok(trippedOut.includes('governor: session cap reached'), trippedOut);
+  assert.ok(trippedOut.includes('write the handoff'), trippedOut);
+
+  // Only now, after that prompt has been shown once, are non-allowlisted
+  // tools denied.
+  const o = hookOut(gate(s, 'Bash', { command: 'npm test' }));
+  assert.equal(o.permissionDecision, 'deny');
+  // The allowlist still works under the new default: Read, safe Bash and a
+  // handoff-path Write/Edit all still pass so the session can finish the handoff.
+  assert.equal(gate(s, 'Read', { file_path: 'anything.js' }).out, '');
+  assert.equal(gate(s, 'Bash', { command: 'git status' }).out, '');
+  assert.equal(gate(s, 'Write', { file_path: 'docs/handoffs/2026-09-22-main.md' }).out, '');
 });
 
 test('writing the handoff lifts the gate', () => {

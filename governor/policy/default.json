@@ -43,6 +43,6 @@
     "backend": ["+backend-dev", "+playwright"],
     "content": ["+content-studio", "+chrome-devtools-mcp"]
   },
-  "enforce": { "reads": false, "cap": false },
+  "enforce": { "reads": false, "cap": true },
   "harnessSkill": null
 }
