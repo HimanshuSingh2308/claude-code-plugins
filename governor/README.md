@@ -8,7 +8,7 @@ knowledge graph.
 Nothing in the plugin names a project, a game or a user. A project opts in by having
 `.claude/governor.json`; a project without one gets `policy/default.json`.
 
-Version 0.1.1. Node 24, no npm dependencies.
+Version 0.1.2. Node 24, no npm dependencies.
 
 ## Install
 
@@ -37,16 +37,17 @@ Then reload plugins (`/reload-plugins`) or restart the session.
 | `agentTypes` | `Explore: lookup`, `*-reviewer: review`, `kg-*: lookup`, … | subagent_type glob to tier |
 | `keywords` | verify/review/lookup/debug/implement word lists | fallback tier by description or prompt |
 | `defaultTier` | `implement` | an unclassified agent is never downgraded |
-| `override` | `!model=` | prompt token that wins over the tier |
+| `respectExplicitModel` | `true` | **the cost lever, since 0.1.2**: when an Agent call already carries an explicit `model`, keep it rather than rewriting it to the tier's model (no rewrite counted, `governor.log` gets one `explicit model kept` line). Set `false` to force the tier model even over an explicit one |
+| `override` | `!model=` | prompt token that wins over the tier - the `!` is optional, see **Override tokens** below |
 | `effort.default` | `medium` | what SessionStart reports against |
 | `effort.raiseFor` | `["debug", "design"]` | prompt words that re-print the recommendation |
 | `reads.wholeFileLimit` | `3` | whole reads of one path before the warning |
 | `reads.largeFileLines` | `2000` | a shorter file is never denied |
-| `reads.override` | `!reads=off` | disables read denial for the session |
+| `reads.override` | `!reads=off` | disables read denial for the session - the `!` is optional |
 | `session.maxTurns` | `2500` | cap on assistant turns |
 | `session.maxCompactions` | `2` | cap on compactions |
-| `session.handoffPath` | `docs/handoffs/` | where the handoff is written, and the cap allowlist |
-| `session.override` | `!cap=off` | lifts the cap gate for the session |
+| `session.handoffPath` | `docs/handoffs/` | where the handoff is written, and the cap allowlist - matched anywhere in a Write/Edit's path since 0.1.2, not only relative to `cwd` (see **Rollout** below) |
+| `session.override` | `!cap=off` | lifts the cap gate for the session - the `!` is optional |
 | `memory.areas` | three globs | path glob to area alias; `{1}` is the first `*` |
 | `memory.rulesDir` | `.claude/rules` | area rule files, committed |
 | `memory.tasksDir` | `.claude/memory/tasks` | per-branch notes, gitignored by the fold |
@@ -62,19 +63,38 @@ The Agent model rewrite is always on; it is not behind an `enforce` switch.
 
 ## The hooks
 
-All eight registrations are in `hooks/hooks.json` and run as
+All nine registrations are in `hooks/hooks.json` and run as
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/<script>.mjs"`.
 
 | Event | Matcher | Script | What it does |
 |---|---|---|---|
-| PreToolUse | `Agent` | `pre-tool-agent.mjs` | resolves the tier, returns `updatedInput` with the tier's model and a `governor: tier <t> -> <model>` line; replaces a `<!-- harness-rules -->` block. Never denies. |
+| PreToolUse | `Agent` | `pre-tool-agent.mjs` | resolves the tier, returns `updatedInput` with the tier's model and a `governor: tier <t> -> <model>` line unless the call already carries an explicit model and `respectExplicitModel` is true; replaces a `<!-- harness-rules -->` block. Never denies. |
 | PreToolUse | `Read` | `pre-tool-read.mjs` | third whole read warns with KG symbols and attached memories; fourth denies a large file when `enforce.reads` |
-| PostToolUse | `Read` | `post-tool-read.mjs` | counts the read as whole or partial |
-| UserPromptSubmit | — | `user-prompt.mjs` | counts turns and compactions, records override tokens, injects the status line, trips the cap |
-| PreToolUse | `*` | `pre-tool-cap.mjs` | after the cap, denies everything but Read/Glob/Grep, handoff writes and read-only git |
-| PostToolUse | `Write\|Edit` | `post-tool-write.mjs` | marks the handoff written; indexes memory files into the graph |
+| PostToolUse | `Read` | `post-tool-read.mjs` | counts the read as whole or partial; records `lastRepoDir` from the file's git toplevel |
+| UserPromptSubmit | — | `user-prompt.mjs` | counts turns and compactions, records override tokens, injects the status line, trips the cap (recording `capReachedAt`), also checks the filesystem for a handoff already on disk |
+| PreToolUse | `*` | `pre-tool-cap.mjs` | after the cap, denies everything but Read/Glob/Grep, handoff writes and read-only git; also checks the filesystem for a handoff already on disk before denying |
+| PostToolUse | `Write\|Edit` | `post-tool-write.mjs` | marks the handoff written; records `lastRepoDir`; indexes memory files into the graph |
+| PostToolUse | `Bash` | `post-tool-bash.mjs` | rescans the handoff dir and marks the handoff written - a Bash heredoc never goes through the Write/Edit hook |
 | SessionStart | — | `session-start.mjs` | branch, task memory pointer, touched areas and the rule files that exist, profile, effort |
 | PreCompact | — | `pre-compact.mjs` | stores the status so the first post-compaction turn carries it |
+
+### Override tokens
+
+`!model=<name>`, `!reads=off` and `!cap=off` all work with or without the leading
+`!`. Drop it - the recommended spelling is `governor cap=off`, a leading word so
+there is nothing at position zero for Claude Code's run-a-shell-command shortcut to
+catch. That shortcut fires whenever `!` is the very first character of the whole
+prompt box, so `!cap=off` typed alone as the entire message never reaches the hook
+at all; typed after other words (`noted, !cap=off`) it is fine, since the shortcut
+only ever looks at position zero. Either spelling is matched word-bounded (start of
+prompt or whitespace before, whitespace or end after), so `!cap=off`, `cap=off` and
+`governor cap=off` all set the override, while `handicap=off` or `cap=offline` do
+not. `model=` only accepts `haiku|sonnet|opus|fable|[a-z0-9.-]+` as the value, so a
+stray `model=` in a pasted code block is never mistaken for the token.
+
+When even that is inconvenient - or when driving the override from a command rather
+than typing it - `/governor cap off|on` and `/governor reads off|on` write the
+override directly into session state; see **Commands**.
 
 ### Harness contract this plugin relies on
 
@@ -188,11 +208,12 @@ graph stays owned by project-manager.
 Session state is one file per session,
 `<scratchpad_dir or os.tmpdir()>/governor-<session_id>.json`:
 turns, compactions, per-file read counts, rewrites, denials, warnings, active
-overrides, cap reached, handoff written, profile, branch and areas.
+overrides, cap reached (and when, `capReachedAt`), handoff written, profile, branch,
+areas, and `lastRepoDir` (the git toplevel of the last file read or written).
 
 ## Commands
 
-`/governor status | profile <name|off> | memory fold | task fold [branch] | handoff`
+`/governor status | cap off|on | reads off|on | profile <name|off> | memory fold | task fold [branch] | handoff`
 
 `status` is self-locating: `status.mjs` takes `--cwd` and `--scratchpad`, not a
 session id. When `--session` is not given it derives the session id from the
@@ -202,7 +223,13 @@ interactive-session layout above); failing that, it uses the newest
 `os.tmpdir()`. If none of that finds a state file, it prints a plain
 `governor: no session state file found ...` line instead of a JSON zero state,
 so a missing file is never mistaken for a session that has genuinely done
-nothing yet.
+nothing yet. (The self-locating logic is shared with `override.mjs` via
+`scripts/lib/session.mjs`.)
+
+`cap off|on` and `reads off|on` run `scripts/override.mjs --scratchpad <dir> --cap
+off|on` and/or `--reads off|on`, writing the override into session state directly -
+the reliable alternative to the `cap=off`/`reads=off` prompt tokens (see **Override
+tokens**).
 
 The folds are propose-then-apply. `fold.mjs` prints a JSON plan and moves nothing;
 only `--apply --approved <plan.json>` acts, and `--apply` alone exits non-zero. The
@@ -296,11 +323,33 @@ the file was read three times, never a fourth.
 - 0.1.0: the Agent rewrite, the budget and status, SessionStart and PreCompact, the
   read counter in warn-only mode, `status`, the harness skill marker, the fold engine
   and the memory indexer. `enforce.reads` and `enforce.cap` ship false.
-- 0.1.1 (this version): `status` is self-locating from `--scratchpad` instead of
+- 0.1.1: `status` is self-locating from `--scratchpad` instead of
   needing `--session`; the whole-file read counter is race-safe against parallel
   Reads; the harness contract records that interactive sessions do send
   `scratchpad_dir` (only `claude -p` does not). `enforce.cap` turns on by default -
   the cap is now a real gate, not warn-only. `enforce.reads` still ships false.
+- 0.1.2 (this version): five bugs found live in an interactive 0.1.1 session.
+  (1) A handoff already on disk (a Bash heredoc, or a write from before the plugin
+  loaded) was never credited - `pre-tool-cap.mjs` and `user-prompt.mjs` now also scan
+  the filesystem (`lib/paths.mjs`'s `handoffOnDisk`, gated on `capReachedAt` so a
+  stale file from an unrelated past session is never credited), and a new
+  `PostToolUse:Bash` hook (`post-tool-bash.mjs`) rescans on every Bash call. (2) The
+  handoff allowlist and suggested path/branch were resolved against the hook's stdin
+  `cwd`, which drifts - `isUnderHandoff` now matches `handoffPath` anywhere in the
+  file's path instead of a cwd-relative prefix, and a new `lastRepoDir` in state (set
+  by `post-tool-read.mjs`/`post-tool-write.mjs` from the git toplevel of the last file
+  touched) is preferred over `cwd` for the suggested handoff path and branch slug. (3)
+  `!cap=off`/`!reads=off`/`!model=` typed alone never reached the hook - Claude Code's
+  run-a-shell-command shortcut swallows a prompt that starts with `!`. All three
+  tokens now match with or without the leading `!`, word-bounded (see **Override
+  tokens**); `/governor cap off|on` and `/governor reads off|on`
+  (`scripts/override.mjs`) write the override directly into state as a spelling-proof
+  alternative. (4) A new `respectExplicitModel` policy key (default true) keeps an
+  Agent call's explicit `model` instead of rewriting it to the tier's when the prompt
+  happens to match a different tier's keywords. (5) `resolveTier` now ranks a
+  multi-tier keyword match by `TIER_PRIORITY` (implement/debug > verify/review/gate >
+  lookup/explore) instead of object-declaration order. `status` also now reports
+  `capReachedAt`, a live `handoffOnDisk` filesystem check, and `lastRepoDir`.
 - 0.2.0: turn on read denial by default too.
 - 0.3.0: run the folds for real, once the alias table is approved.
 - 0.4.0: profiles, once the runtime reload is proven.

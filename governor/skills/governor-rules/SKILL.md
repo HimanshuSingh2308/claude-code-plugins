@@ -25,14 +25,24 @@ An Agent call's model is chosen by tier, not by habit.
 The tier is resolved in this order:
 
 1. `subagent_type` against `agentTypes` in the policy: exact key, then glob
-   (`*-reviewer`, `kg-*`).
-2. The first keyword group in `keywords` matching the description or the first 400
-   characters of the prompt.
+   (`*-reviewer`, `kg-*`). This always beats a keyword match.
+2. `keywords`: when several groups match the description or the first 400
+   characters of the prompt, the highest tier wins, not the first one found - a
+   description matching both "verify" and "fix" resolves to `implement`, not
+   `verify`. The priority order is implement/debug, then verify/review/gate, then
+   lookup/explore.
 3. `defaultTier`, which is `implement`. An unclassified agent is never silently
    downgraded.
 
 The hook rewrites the call with `updatedInput` and appends one line to the prompt:
 `governor: tier <t> -> <model>`. It never denies an Agent call.
+
+**The cost lever**: when the call already carries an explicit `model` and
+`respectExplicitModel` (default `true`) is on, the tier is resolved for reporting but
+the call's own model is kept - nothing is rewritten and it is not counted as a
+rewrite. A dispatcher that picked "opus" on purpose keeps opus even if the prompt
+happens to match a lower tier's keywords. Set `respectExplicitModel: false` in a
+project's `.claude/governor.json` to force the tier model even over an explicit one.
 
 ## The harness block
 
@@ -63,25 +73,45 @@ denials. When turns reach `session.maxTurns` or compactions reach
 `<handoffPath><yyyy-mm-dd>-<branch-slug>.md` and continue in a fresh session.
 
 `enforce.cap` is true by default since 0.1.1. While the cap holds and `enforce.cap`
-is true, only these pass: Read, Glob, Grep; Write or Edit under `handoffPath`; Bash
-starting with `git status`, `git diff`, `git log`, `git add`, `git commit`.
-Everything else is denied with the reason - the gate only starts denying once the
-cap-reached status line has been shown once, on the prompt where turns or
-compactions first cross their limit, so it is never a surprise on the very first
-tool call after upgrading into a session that was already over the cap.
-`!cap=off` for the session, or `"enforce": {"cap": false}` in a project's
-`.claude/governor.json`, turns it back off.
+is true, only these pass: Read, Glob, Grep; Write or Edit whose path contains
+`handoffPath` anywhere, not only relative to the hook's `cwd`; Bash starting with
+`git status`, `git diff`, `git log`, `git add`, `git commit`. Everything else is
+denied with the reason - the gate only starts denying once the cap-reached status
+line has been shown once, on the prompt where turns or compactions first cross their
+limit, so it is never a surprise on the very first tool call after upgrading into a
+session that was already over the cap. `cap=off` for the session (see **Overrides**),
+or `"enforce": {"cap": false}` in a project's `.claude/governor.json`, turns it back
+off.
+
+Since 0.1.2, the gate and the status line also check the filesystem itself for a
+handoff that already exists - written by a Bash heredoc, or from before the plugin
+loaded this session - so state never having seen a Write/Edit for it does not keep
+denying everything forever. A file counts once its mtime is at or after the session's
+recorded `capReachedAt`, so a stale handoff left over from an unrelated past session
+is never credited. `lastRepoDir` (the git toplevel of the last file read or written)
+is preferred over `cwd` when locating the handoff dir and when suggesting the handoff
+path and branch slug, since `cwd` can drift.
 
 A handoff says what is done, what is not, which files matter and why, the next
 concrete step, and the traps found. It is not a summary of the conversation.
 
 ## Overrides
 
-Overrides are prompt tokens, never settings edits, and they last the session:
+Overrides are prompt tokens, never settings edits, and they last the session. The
+recommended spelling drops the leading `!` and puts a word in front - `governor
+cap=off` - because Claude Code treats a bare `!` as the very first character of the
+whole prompt box as its run-a-shell-command shortcut, so `!cap=off` typed alone as
+the entire message never reaches the hook at all. Both spellings work, matched
+word-bounded anywhere in the prompt:
 
-- `!model=<name>` - this Agent call keeps the model you asked for.
-- `!reads=off` - no read denials.
-- `!cap=off` - no cap gate.
+- `model=<name>` (or `!model=<name>`) - this Agent call keeps the model you asked
+  for. Only `haiku`, `sonnet`, `opus`, `fable` or an arbitrary lowercase
+  `[a-z0-9.-]+` id is accepted as the value.
+- `reads=off` (or `!reads=off`) - no read denials.
+- `cap=off` (or `!cap=off`) - no cap gate.
+
+When typing the token is inconvenient, `/governor cap off|on` and `/governor reads
+off|on` write the override directly into session state via `scripts/override.mjs`.
 
 ## Effort
 
