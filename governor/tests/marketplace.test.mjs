@@ -11,7 +11,7 @@ test('governor is registered', () => {
   const e = mp.plugins.find((p) => p.name === 'governor');
   assert.ok(e, 'no governor entry');
   assert.equal(e.source, './governor');
-  assert.equal(e.version, '0.1.1');
+  assert.equal(e.version, '0.1.2');
   assert.equal(e.version, plugin.version);
   assert.ok(e.description && e.description.length > 20);
   assert.ok(e.author && e.author.name);
