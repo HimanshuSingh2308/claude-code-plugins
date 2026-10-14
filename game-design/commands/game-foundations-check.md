@@ -9,6 +9,10 @@ Audit the game mechanics foundation skills for quality, completeness, and integr
 
 **Arguments**: $ARGUMENTS
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Overview
 
 Foundation skills are the knowledge layer that informs game design (PRD phase) and game building (implementation phase). This command validates that:
@@ -95,7 +99,7 @@ For each foundation skill, evaluate:
 
 #### Relevance (score /5)
 - [ ] Content is specific to **browser games** (not generic game dev)
-- [ ] Examples use **vanilla JS/CSS** (matches Weekly Arcade stack)
+- [ ] Examples use **vanilla JS/CSS** (matches the Weekly Arcade stack; engine skills such as babylonjs-3d, phaser and godot are exempt)
 - [ ] Patterns are **actionable** — can be copy-adapted into a game
 - [ ] Numbers/formulas are **calibrated for casual web games** (not AAA)
 - [ ] References current web APIs (Web Audio, CSS containment, etc.)

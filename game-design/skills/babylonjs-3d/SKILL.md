@@ -25,6 +25,10 @@ Babylon.js is a powerful, open-source 3D engine for the web. It renders via WebG
 
 ---
 
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
+
 ## Project Setup
 
 ### NPM (Recommended for Production)
@@ -62,7 +66,9 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 
 When using CDN, everything is under the `BABYLON` namespace.
 
-### Astro Integration
+### Astro Integration (WA only)
+
+`GameLayout` is the Weekly Arcade layout. A standalone game uses its own page shell or bundler entry.
 
 ```astro
 ---
@@ -2062,7 +2068,7 @@ After completing any task using this skill:
 - [ ] Specify interaction: mouse/touch raycasting, drag-and-drop, physics-based?
 
 ### For Build Phase
-- [ ] Load Babylon.js from CDN with `is:inline` in Astro (critical!)
+- [ ] (WA only) Load Babylon.js from CDN with `is:inline` in Astro (critical!)
 - [ ] Defer `BABYLON.*` constructors to inside `initGame()` (not module level)
 - [ ] Use `ArcRotateCamera` with radius/beta limits for controllable orbit
 - [ ] Add `HemisphericLight` + `DirectionalLight` for balanced lighting

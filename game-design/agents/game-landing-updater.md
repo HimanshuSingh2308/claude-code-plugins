@@ -11,6 +11,10 @@ You update all public-facing pages when a new game is added:
 - `apps/web-astro/src/pages/games/index.astro` — Games catalog
 - `apps/web-astro/src/pages/games/{category}/index.astro` — Category pages (puzzle, arcade, strategy, 3d)
 
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
+
 ## Required Input
 
 You receive extracted game variables: GAME_NAME, GAME_SLUG, GAME_EMOJI, GAME_DESC, GAME_TAGS, GAME_GENRE, GAME_KEYWORDS, GAME_THEME_COLOR.

@@ -1,6 +1,10 @@
 # Orchestrator Guardrails
 
-Safety rules and boundaries for the Weekly Game Release Orchestrator. This skill defines what operations are allowed, blocked, or require confirmation during autonomous workflow execution.
+Safety rules and boundaries for the release orchestrators: `weekly-release-orchestrator` (Weekly Arcade) and `game-release-orchestrator` (standalone games, see "Standalone game releases" at the end). This skill defines what operations are allowed, blocked, or require confirmation during autonomous workflow execution.
+
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
 
 ## Purpose
 
@@ -74,7 +78,7 @@ Accessing FIREBASE_TOKEN
 
 These operations require explicit user confirmation before proceeding:
 
-#### File Modifications (Outside New Game)
+#### File Modifications (Outside New Game) (WA only)
 ```yaml
 Trigger: Edit or Write to files outside /games/{new-game-slug}/
 Files requiring confirmation:
@@ -155,7 +159,7 @@ git branch --list
 ls, cat, head, tail (read operations)
 ```
 
-#### New Game File Operations
+#### New Game File Operations (WA only)
 ```yaml
 Scope: /apps/web/src/games/{new-game-slug}/**
 Allowed:
@@ -192,7 +196,7 @@ Add label to issue
 Request review
 ```
 
-#### Output Files
+#### Output Files (WA only)
 ```yaml
 Scope: ~/Documents/weekly-games/**
 Allowed:
@@ -204,7 +208,7 @@ Allowed:
 
 ---
 
-## Path Boundaries
+## Path Boundaries (WA only)
 
 ### ALLOWED Paths (Full Access)
 
@@ -295,7 +299,7 @@ CI/CD:
 
 ---
 
-## Pre-Flight Checks
+## Pre-Flight Checks (WA only)
 
 Before starting any workflow, verify ALL conditions:
 
@@ -364,9 +368,10 @@ Overall: READY / NOT READY
 
 ---
 
-## Dry-Run Mode Behavior
+## Dry Run Mode Behavior
 
-When `--dry-run` flag is set:
+Orchestrators execute by default. When the `--dry-run` flag is set, nothing changes and the
+plan is printed. In execute mode every CONFIRM operation still asks at that moment.
 
 ### Simulation Rules
 ```yaml
@@ -416,7 +421,7 @@ Skill/Agent Invocations:
 2. Create {n} issues for deferred bugs
 
 ### Execution Command
-To execute this plan: /weekly-game-release --execute
+To execute this plan: /weekly-game-release (same flags, without --dry-run)
 ```
 
 ---
@@ -469,3 +474,56 @@ All guardrail decisions are logged:
 - `CONFIRM`: User confirmation requested
 - `BLOCK`: Operation blocked
 - `ABORT`: Workflow aborted due to violation
+
+---
+
+## Standalone game releases
+
+Used by `game-release-orchestrator` (`/game-release`). The operation classes above (BLOCKED,
+CONFIRM, SAFE), the dry-run rules, error handling and audit log apply unchanged; the sections
+marked (WA only) are replaced by the rules below.
+
+### Path boundaries
+```yaml
+Game repo (the one resolved in Phase 0):
+  Permissions: CREATE, READ, EDIT inside the repo's working files on the work branch
+  CONFIRM: CI files (.github/**), dependency manifests beyond the engine's own scaffold,
+           export_presets.cfg target additions, adding Capacitor / Electron / Tauri
+  FORBIDDEN: .env*, *credentials*, *secret*, keystores, .godot/export_credentials.cfg
+             (read presence only, never contents)
+Weekly Arcade monorepo: FORBIDDEN (a standalone release never writes there)
+Output: ~/Documents/game-releases/** (state, PRD, design, release notes, store checklist)
+Build output: build/<target>/ in the game repo, untracked
+```
+
+### BLOCKED (in addition to the list above)
+- Writing a GitHub token, keystore password or any secret into a file, git config, remote URL,
+  log or the state file; printing a secret value
+- Store uploads (App Store Connect, Play Console, itch.io, Steam) and production deploys, unless
+  the user confirms at that moment; no flag pre-authorizes them
+- Deleting a remote repository, deleting or moving an existing tag
+- `npm publish`, force push, history rewrites on main
+
+### CONFIRM
+- `gh repo create`, first push of main, pushing the work branch
+- Merge (only with `--merge`), `git tag`, `gh release create` (note when the repo is public)
+- Creating `.claude/game-context.json`, AGENTS.md or CLAUDE.md in an existing repo (never
+  overwrite existing ones)
+- Installing any tool (`game-toolchain`); credit-spending generation (Meshy, image models)
+- Adding a third-party asset (license recorded)
+
+### SAFE
+- Read anything in the game repo; build, test, headless validation, exports to build/
+- Create the skeleton in a newly created, empty repo
+- Create issues and PRs in the game's own repo
+
+### Pre-flight
+```bash
+git --version && gh --version && gh auth status   # chosen account has the repo scope
+# in the game repo, after Phase 0:
+[ -z "$(git status --porcelain)" ] || FAIL "Uncommitted changes detected"
+git symbolic-ref -q HEAD >/dev/null || FAIL "Detached HEAD"
+git remote get-url origin >/dev/null || FAIL "No origin remote"
+git fetch origin || FAIL "Cannot reach origin"
+# then the game-toolchain table for the engine and targets
+```

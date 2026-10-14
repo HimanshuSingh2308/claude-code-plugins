@@ -12,13 +12,13 @@ art: not as icons, not as props, not as placeholders that survive to a commit.
 
 ---
 
-## 1. Availability in this environment (verified, 2026-09-17)
+## 1. Availability in this environment (verified 2026-09-17; Meshy updated 2026-10-14)
 
 | Tool | Status | How to reach it |
 |---|---|---|
 | **Nano Banana (Gemini image generation)** | **Available now** | The `gemini` CLI is on PATH and there is a `nano-banana` skill in this environment that drives it. Use the skill rather than shelling out directly |
-| **Blender** | **Available now** | CLI at `/opt/homebrew/bin/blender` (5.2.0 LTS), plus a Blender MCP server, so Blender can be scripted directly. See [blender-pipeline.md](blender-pipeline.md) |
-| **Meshy AI** | **NOT configured** | No API key, no MCP server, no reference anywhere in settings or in this repo. The workflow below is documented so it is ready, but **it requires setup before any use**. Do not plan work that assumes it is one call away |
+| **Blender** | **Available now** | CLI at `/opt/homebrew/bin/blender` (5.2.0 LTS, arm64 Homebrew at `/opt/homebrew`), plus the Blender MCP server (registered as `blender`, server at `~/tools/blender-mcp`). The live tools need a GUI Blender with the add-on connected; the `*_for_cli` tool variants run a background Blender. See [blender-pipeline.md](blender-pipeline.md) |
+| **Meshy AI** | **Available (API, `meshy-7`)** | Set up in `~/meshy-eval`: API key in its `.env`, helper scripts `rig_and_walk.py`, `retarget_mixamo.py`, `add_idle_animation.py`, and `assets/viewer.html` for review. Used on 2026-10-13 to generate 8 production models (about 600 credits). **Verify the key is present before planning on it** (for example `grep -c '^MESHY' ~/meshy-eval/.env`, which prints a count, never the value). **Never print the key, and never copy it or the `.env` into any game repo.** Every call spends credits: estimate count and credits and get user approval first |
 
 ## 2. Nano Banana / Gemini image generation
 
@@ -66,7 +66,7 @@ art: not as icons, not as props, not as placeholders that survive to a commit.
 
 **Cost:** cheap per image. The real cost is curation time and the pull toward inconsistency.
 
-## 3. Meshy AI and comparable text-to-3D / image-to-3D (requires setup)
+## 3. Meshy AI and comparable text-to-3D / image-to-3D (available via API; spends credits)
 
 **State of the field as of 2026:** Meshy is on version 7 (`meshy-7` since 12 August 2026), with
 Meshy 6 and a faster Meshy 6 Lite still offered; generation takes on the order of a minute.

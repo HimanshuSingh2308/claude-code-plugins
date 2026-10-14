@@ -13,6 +13,10 @@ No images, no canvas — pure CSS divs, gradients, shadows, and pseudo-elements.
 
 ---
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## 1. Character Design
 
 ### The Universal Character Template

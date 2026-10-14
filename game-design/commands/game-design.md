@@ -9,6 +9,10 @@ Use the product designer agent to research and produce data-driven game PRDs.
 
 **Arguments**: $ARGUMENTS
 
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
+
 ## Parse Arguments
 
 Determine the mode from the first argument:
@@ -26,9 +30,10 @@ If `--trends-only`: skip PRD creation, only return market trend research.
 
 ## Execution
 
-Spawn the `product-designer` agent with:
+Resolve `game-context` first (for `research` mode with no game yet, state the intended platform or ask), then spawn the `product-designer` agent with the resolved `Context:` line so it does not re-ask:
 
 ```
+{resolved Context: line from game-context}
 Task: {mode} a game PRD
 Concept/Slug: {parsed from arguments}
 Project path: {current working directory}
@@ -36,7 +41,7 @@ Flags: {any --flags}
 
 Instructions:
 1. Check docs/ for existing PRDs
-2. Check apps/web-astro/src/data/games/ for shipped games
+2. (WA only) Check apps/web-astro/src/data/games/ for shipped games. Standalone: check the game's own repo instead
 3. Perform web research relevant to the concept
 4. {Create new PRD / Update existing / Review all} per the mode
 5. Save new/updated PRDs to docs/{game-slug}-prd.md

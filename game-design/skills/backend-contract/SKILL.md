@@ -4,6 +4,10 @@ Applied automatically when building games, submitting scores, awarding coins, or
 
 ---
 
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
+
 ## Score Submission Contract
 
 Games submit scores via `window.gameCloud.submitOrQueue(gameId, scoreData)`.

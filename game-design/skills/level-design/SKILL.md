@@ -10,6 +10,10 @@ description: >
 
 # Level Design & Spatial Layout
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Core Principle: The Game Space IS the Game
 
 A game's spatial layout directly shapes player behavior. Where you place things determines what players do, what they see, and how they feel. Level design is not decoration — it's game design.

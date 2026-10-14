@@ -11,13 +11,17 @@ description: >
 
 **Arguments**: $ARGUMENTS
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Step 0: Check for Existing Post-Launch Plan
 
 Before running the full analysis, check if a post-launch plan already exists for this game.
 
 ```
 GAME_SLUG = first word of $ARGUMENTS (e.g., "tiny-tycoon")
-PLAN_PATH = apps/web/src/games/{GAME_SLUG}/post-launch.md
+PLAN_PATH = apps/web/src/games/{GAME_SLUG}/post-launch.md   (WA only; standalone: <game repo>/docs/post-launch.md)
 
 IF file exists at PLAN_PATH:
   READ the file
@@ -97,6 +101,8 @@ After launch, improvements fall into five categories. Work top-to-bottom:
 ## 2. Signal Detection
 
 ### What to Look For
+
+Leaderboard and score-metadata sources below are WA data (WA only). For a standalone game, read the same signals from its own analytics or backend, if any.
 
 | Signal | Where to Find It | What It Means |
 |--------|------------------|---------------|
@@ -227,8 +233,8 @@ After each post-launch iteration:
 ```
 [ ] All critical bugs fixed first
 [ ] Changes tested on mobile (375px) and desktop
-[ ] Score submission still works
-[ ] Achievements still trigger correctly
+[ ] Score submission still works (WA only, or the game's own backend)
+[ ] Achievements still trigger correctly (WA only, or the game's own achievements)
 [ ] localStorage save/load still works
 [ ] No new console errors
 [ ] Visual QA via `game-visual-tester` agent — screenshots before/after on desktop + mobile
@@ -250,7 +256,7 @@ For games that stay in the arcade long-term:
 | **Month 3** | Consistent daily submissions | Zero activity for weeks |
 
 If a game goes quiet, consider:
-1. Featuring it on the landing page again
+1. Featuring it on the landing page again (WA only)
 2. Adding a new mechanic or event
 3. Creating a "challenge of the week" variant
 4. Retiring it gracefully (archive, don't delete)
@@ -332,9 +338,9 @@ Each layer catches players who might slip through the one above.
 After completing the full analysis, save the plan as a file inside the game folder
 so subsequent runs can resume from where you left off.
 
-**File**: `apps/web/src/games/{GAME_SLUG}/post-launch.md`
+**File** (WA only): `apps/web/src/games/{GAME_SLUG}/post-launch.md`. For a standalone game, save it in the game's own repo (for example `docs/post-launch.md`).
 
-Also save a copy to: `~/Documents/weekly-games/{GAME_SLUG}-post-launch.md`
+Also save a copy to (WA only): `~/Documents/weekly-games/{GAME_SLUG}-post-launch.md`
 
 ### File Format
 

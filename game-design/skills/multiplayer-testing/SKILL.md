@@ -9,11 +9,15 @@ description: >
 
 # Multiplayer Testing Guide
 
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
+
 ## Local Testing Setup
 
 ### Two-Tab Testing (Most Common)
 
-1. Start all three services:
+1. Start all three services (WA only: these are the Weekly Arcade monorepo targets; a standalone game starts its own server and client):
    ```bash
    npx nx run api:serve          # Port 8080
    npx nx run realtime:serve     # Port 3001
@@ -37,7 +41,9 @@ description: >
 
 **Console logging:**
 ```javascript
-// Temporarily add to game.js for debugging
+// Temporarily add to the game's code for debugging. WA game authored in game-src:
+// add it to game-src/{id}/ and run node scripts/build-games.mjs --game {id}
+// (never hand-edit the generated game.js); remove it before committing.
 window.multiplayerClient.on('game:state', (d) => console.log('STATE', d));
 window.multiplayerClient.on('game:move-rejected', (d) => console.warn('REJECTED', d));
 window.multiplayerClient.on('error', (d) => console.error('ERROR', d));

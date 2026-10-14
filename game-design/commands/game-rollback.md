@@ -1,6 +1,6 @@
 ---
 description: Revert a recent game deployment - emergency recovery with safety checks
-argument-hint: <game-slug> [--to <commit> | --pr <number>] [--dry-run]
+argument-hint: '<game-slug> [--to <commit> | --pr <number>] [--dry-run]'
 ---
 
 # Game Rollback
@@ -8,6 +8,10 @@ argument-hint: <game-slug> [--to <commit> | --pr <number>] [--dry-run]
 Emergency rollback of a recently deployed game to a previous working state.
 
 **Arguments**: $ARGUMENTS
+
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
 
 ## Overview
 
@@ -35,7 +39,8 @@ Options:
   --to <commit>            Rollback to specific commit
   --pr <number>            Rollback the changes from specific PR
   --steps <n>              Rollback n releases (default: 1)
-  --dry-run                Preview rollback without applying
+  --dry-run                Show the full plan and change nothing (default: execute;
+                           confirmations still ask at each step)
   --force                  Skip PR, direct push (dangerous)
   --preserve-scores        Don't rollback leaderboard changes
 ```

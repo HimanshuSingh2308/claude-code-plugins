@@ -20,6 +20,12 @@ scoring systems, leaderboards, and optional multiplayer.
 
 ---
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
+PRDs include a "Modules and Systems" list grouped by the layers in the `game-architecture` skill (core loop, gameplay systems, world, UI screens, meta features, audio, input, platform adapters), so the build starts modular.
+
 ## Phase 1: Concept Discovery
 
 If the user has a vague idea or just a theme/genre, help them crystallize it by exploring:

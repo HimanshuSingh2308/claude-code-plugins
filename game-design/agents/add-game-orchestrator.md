@@ -8,6 +8,16 @@ model: sonnet
 
 You coordinate the full process of adding a new game to the Weekly Arcade project. You delegate work to specialized sub-agents and ensure all phases complete correctly.
 
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
+
+**Pass the context down.** Put the resolved line `Context: Weekly Arcade game {GAME_SLUG}` at the top of every sub-agent dispatch prompt (game-prd-extractor, game-builder, game-landing-updater, game-registry-updater, game-seo-updater, game-integration-checker) so no sub-agent re-resolves or re-asks. A new game with no registry entry or games json yet counts as Weekly Arcade here, because it is being added through this workflow.
+
+Run `game-toolchain` for the tools this task needs before starting.
+
+Load `game-architecture` and pass the modularity rule to `game-builder`; the build is modular code (WA: ES modules in `apps/web-astro/game-src/{GAME_SLUG}/` with a `main.js` entry, bundled by `node scripts/build-games.mjs` into the generated, committed `public/games/{GAME_SLUG}/game.js`; if `scripts/build-games.mjs` does not exist in the checkout, internal modules inside a single hand-written IIFE `game.js`, and tell the user).
+
 ## Workflow
 
 You receive a PRD (or game concept) and drive it through these phases:
@@ -20,10 +30,10 @@ Wait for the result — all subsequent phases depend on these variables.
 Spawn the `game-builder` agent with:
 - The extracted variables from Phase 1
 - The full PRD content
-- Instruction to build in `apps/web-astro/` (Astro path)
-- **CRITICAL REMINDER**: The game MUST call `window.gameHeader.init()` with `buttons: ['sound', 'leaderboard', 'auth']` in its initialization code. Without this, the shared header won't show Sign In, Leaderboard, or Sound buttons. This applies to ALL game architectures (componentized or single-file IIFE).
+- Instruction to build in `apps/web-astro/` (Astro path): source in `game-src/{GAME_SLUG}/`, then `node scripts/build-games.mjs --game {GAME_SLUG}`
+- **CRITICAL REMINDER**: The game MUST call `window.gameHeader.init()` with `buttons: ['sound', 'leaderboard', 'auth']` in its initialization code. Without this, the shared header won't show Sign In, Leaderboard, or Sound buttons. This applies to ALL game architectures (game-src modules or the single-IIFE fallback).
 
-Wait for completion — the game file must exist before integration steps.
+Wait for completion - the game source and the generated `game.js` must exist before integration steps.
 
 ### Phase 3: Parallel Integration (spawn all 3 simultaneously)
 
@@ -46,7 +56,8 @@ After all Phase 3 agents complete, spawn the `game-integration-checker` agent to
 - No missing script includes
 - Achievement IDs are registered
 - Homepage, /games/ index, and category pages all include the new game
-- `gameHeader.init` is called in the game JS with `buttons: ['sound', 'leaderboard', 'auth']`
+- `gameHeader.init` is called in the game source (`game-src/{GAME_SLUG}/`, or the fallback `game.js`) with `buttons: ['sound', 'leaderboard', 'auth']`
+- `game-src/{GAME_SLUG}/main.js` exists, `game.js` carries the generated banner and `node scripts/build-games.mjs --check` passes (skipped in fallback mode)
 - Build passes (`npx nx run shared:build` and `npx nx run web-astro:build`)
 
 ### Error Handling

@@ -6,7 +6,8 @@ description: >
   WebAudio voices that never end, caches with an unbounded key space, and a second
   rAF loop. Measures each one in a real browser instead of reading for it, because
   every cheap proxy for these metrics forges a leak curve. Run it before every
-  game release and after any merge that touches game.js.
+  game release and after any merge that touches game.js (or, for a WA game
+  authored in game-src, its source).
 ---
 
 # State Sweep
@@ -26,6 +27,10 @@ you fix anything.
 | WebAudio voices | total nodes created | source nodes made vs **ended**; watch the gap, not the totals |
 | A second game loop | fps looks fine | probe-owned `rafLive` on a screen that should not animate |
 | Caches, pools, run arrays | reading the code | the key space and the prune site, both named |
+
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
 
 ## Phase 0 - do not sweep the wrong build
 
@@ -56,8 +61,18 @@ run and everything after this is fiction.
 Fast, and it tells you where to point the browser. Answer each question with a
 line number, not an impression.
 
+Where to point it. For a single-file game, `G` is that `game.js`. For a new
+Weekly Arcade game authored as ES modules in `apps/web-astro/game-src/{id}/`,
+the served `public/games/{id}/game.js` is a generated bundle: run this static
+pass over the source instead (`G=apps/web-astro/game-src/{id}`, add `-r` to each
+grep, run the attribution script once per file, and read module-level
+collections as top-level `let` / `const` rather than the two-space IIFE indent),
+because source lines are what you fix. Fixes go in `game-src/{id}/` followed by
+`node scripts/build-games.mjs --game {id}`. The runtime phases below still load
+the served `game.js`.
+
 ```bash
-G=path/to/game.js
+G=path/to/game.js   # or apps/web-astro/game-src/{id} with grep -r (see above)
 
 # 1. Wiring: every addEventListener, and the function that owns it.
 #    A wire* function called once from boot is fine. The same call inside a
@@ -270,7 +285,7 @@ attached to each. Split them three ways, because they are acted on differently:
 
 - **In this game's files** - fix, then re-run the phase that found it.
 - **In shared or third-party files** - report with the stack; do not edit.
-  `api-client.js` and `auth.js` are blocked by `orchestrator-guardrails`.
+  (WA only) `api-client.js` and `auth.js` are blocked by `orchestrator-guardrails`.
 - **Bounded but unbounded-looking** - a run array that grows one entry per
   layer, a tower that keeps every layer flown. Name the bound and the realistic
   ceiling, and say plainly that it is not a leak, so the next sweep does not

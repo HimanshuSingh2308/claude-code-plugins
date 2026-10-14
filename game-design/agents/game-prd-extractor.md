@@ -8,6 +8,10 @@ model: haiku
 
 You extract structured variables from a game PRD document. Your output is used by downstream agents to create game files, update landing pages, and register in the backend.
 
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
+
 ## Required Output Variables
 
 Extract ALL of the following. If a value is missing from the PRD, flag it clearly.

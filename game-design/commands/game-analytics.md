@@ -9,6 +9,10 @@ View performance metrics, player engagement, and leaderboard statistics for depl
 
 **Arguments**: $ARGUMENTS
 
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
+
 ## Overview
 
 Analyze game performance to:

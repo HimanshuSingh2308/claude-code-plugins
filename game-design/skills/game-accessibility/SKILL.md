@@ -9,6 +9,10 @@ description: >
 
 # Game Accessibility
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Core Principle: Accessibility Expands Your Audience
 
 15-20% of people have some form of disability. Even more have situational impairments (bright sunlight, one hand busy, noisy environment). Accessible games serve MORE players, not fewer.

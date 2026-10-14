@@ -5,9 +5,18 @@ argument-hint: [<workflow-id> | --running | --failed | --completed | --all]
 
 # Workflow Status
 
-View the status and history of Weekly Game Release orchestrator runs.
+View the status and history of release orchestrator runs: `/weekly-game-release` (Weekly Arcade)
+and `/game-release` (standalone games).
 
 **Arguments**: $ARGUMENTS
+
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
+
+The context only sets the default source: Weekly Arcade shows weekly runs, standalone shows
+`/game-release` runs for this game's repo. `--source` overrides it, and when no game context
+resolves (for example run from the home directory) default to `--source all` instead of asking.
 
 ## Overview
 
@@ -34,6 +43,7 @@ Options:
   --limit <n>            Limit results (default: 10)
   --since <date>         Filter by date (YYYY-MM-DD)
   --json                 Output as JSON
+  --source <weekly|game|all>  Which workflows to list (default: from the game context)
 ```
 
 ## Usage Examples
@@ -65,11 +75,17 @@ Options:
 ### Step 1: Locate Workflow Data
 
 ```bash
-WORKFLOW_DIR=~/Documents/weekly-games/workflows/
+# (WA only) weekly releases
+WEEKLY_DIR=~/Documents/weekly-games/workflows/
+ls -la $WEEKLY_DIR/*.json
 
-# List workflow files
-ls -la $WORKFLOW_DIR/*.json
+# standalone game releases (ids start with gr-)
+GAME_DIR=~/Documents/game-releases/workflows/
+ls -la $GAME_DIR/gr-*.json
 ```
+
+Standalone default: keep only files whose `repoPath` is the current game's repo; `--source game`
+shows all standalone runs, `--source all` shows both directories in one table with a Type column.
 
 ### Step 2: Parse Workflow States
 
@@ -83,6 +99,8 @@ FOR each workflow file:
     - lastUpdated
     - game name (if available)
     - final status
+    - workflow type: weekly (from WEEKLY_DIR) or game-release (`workflow: "game-release"`)
+    - game-release only: mode (new | version), version, repoPath, targets, skippedGates
 ```
 
 ### Step 3: Apply Filters
@@ -90,6 +108,7 @@ FOR each workflow file:
 ```yaml
 IF --running:
   FILTER where currentPhase NOT IN ['completed', 'aborted']
+  (game-release runs with status 'awaiting_merge' count as running and show "awaiting merge")
 
 IF --failed:
   FILTER where currentPhase == 'aborted' OR errors.length > 0
@@ -122,7 +141,8 @@ Showing 3 of 3 workflows.
 
 ### Quick Actions
 - View details: `/workflow-status <id>`
-- Resume failed: `/weekly-game-release --resume <id>`
+- Resume failed: `/weekly-game-release --resume <id>` (WA only), or `/game-release --resume <gr-id>`
+  for standalone runs (add `--merge` to merge an awaiting PR, then tag and release)
 - Show failed only: `/workflow-status --failed`
 ```
 

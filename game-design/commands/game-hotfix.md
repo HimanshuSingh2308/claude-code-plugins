@@ -1,6 +1,6 @@
 ---
 description: Emergency hotfix for deployed games with enhanced safety guardrails
-argument-hint: <game-slug> [--issue <number> | --description "<bug>"]
+argument-hint: '<game-slug> [--issue <number> | --description "<bug>"] [--dry-run]'
 ---
 
 # Game Hotfix
@@ -8,6 +8,10 @@ argument-hint: <game-slug> [--issue <number> | --description "<bug>"]
 Apply an emergency fix to a deployed game with enhanced safety measures.
 
 **Arguments**: $ARGUMENTS
+
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
 
 ## Overview
 
@@ -39,7 +43,8 @@ Arguments:
 Options:
   --issue <number>         Link to GitHub issue
   --description "<bug>"    Describe the bug to fix
-  --dry-run                Preview fix without applying
+  --dry-run                Show the full plan and change nothing (default: execute;
+                           confirmations still ask at each step)
   --skip-qa                Skip QA validation (dangerous)
   --no-merge               Create PR only, no auto-merge
 ```
