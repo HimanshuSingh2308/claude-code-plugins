@@ -9,6 +9,10 @@ description: >
 
 # Game Balancing & Progression Design
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Core Principles
 
 1. **Flow State**: Keep players in the "zone" - not too easy, not too hard

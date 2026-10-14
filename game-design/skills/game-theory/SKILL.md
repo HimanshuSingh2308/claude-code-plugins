@@ -11,6 +11,10 @@ description: >
 
 # Game Theory & Player Psychology
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Why This Matters
 
 Every design decision in a game is a psychological decision. Understanding WHY players feel fun, frustration, flow, or boredom lets you design intentionally instead of guessing.
@@ -349,7 +353,9 @@ Fixed rewards lose power fast (hedonic adaptation). Variable rewards don't.
 | **Variable ratio** | +5 to +25 coins, occasional 3x combo bonus, surprise tip | Unpredictable → "one more round" pull |
 | **Variable + escalating** | Streak multiplier + random rush hour + VIP customers | Compounding unpredictability → deep engagement |
 
-### Applying the Hook Model in Weekly Arcade
+### Applying the Hook Model in Weekly Arcade (WA only)
+
+The phases are generic; the implementations below assume WA features (push, cloud save, achievements). A standalone game maps each phase onto its own features.
 
 | Phase | Implementation |
 |-------|---------------|

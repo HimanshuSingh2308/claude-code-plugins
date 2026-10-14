@@ -13,6 +13,10 @@ description: >
 This skill enforces a disciplined bug-fixing workflow for browser games. The cardinal rule:
 **never guess — always prove.**
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## The 5-Phase Workflow
 
 Every bug fix MUST follow these phases in order. Skipping a phase is not allowed.

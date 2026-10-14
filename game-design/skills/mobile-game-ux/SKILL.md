@@ -12,6 +12,10 @@ description: >
 This skill ensures all games are built with mobile-first, touch-friendly experiences that
 prioritize clean UI and intuitive controls.
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Core Principles
 
 ### 1. Mobile-First, Always

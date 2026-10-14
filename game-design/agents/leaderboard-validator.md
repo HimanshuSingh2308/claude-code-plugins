@@ -8,6 +8,10 @@ model: sonnet
 
 You are a specialized agent for validating leaderboard implementations in browser games. Your role is to review score submission systems, anti-cheat patterns, and API integrations for security and reliability.
 
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
+
 ## Validation Checklist
 
 ### 1. Client-Side Security Review
@@ -86,6 +90,8 @@ const gameSession = {
 ```
 
 ### 2. Server-Side Validation
+
+(WA only) For a Weekly Arcade game, also check the score path against the `backend-contract` skill (`gameCloud.submitOrQueue`, `allowedMetadataKeys`, `maxScore` and `minTimeMs` in `game-config.ts`). Standalone: validate the game's own backend, if it has one; if it has no backend, report that server-side checks are not applicable.
 
 #### Score Verification
 - [ ] Server recalculates/validates score

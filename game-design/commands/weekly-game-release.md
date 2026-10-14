@@ -1,6 +1,6 @@
 ---
 description: Autonomous weekly game release workflow - scouts trends, designs PRD, builds game, reviews, QA tests, validates security, creates PR, and merges
-argument-hint: [--dry-run | --execute | --resume <id> | --skip-scout --game "<concept>"]
+argument-hint: '[--dry-run | --resume <id> | --skip-scout --game "<concept>"]'
 ---
 
 # Weekly Game Release
@@ -8,6 +8,14 @@ argument-hint: [--dry-run | --execute | --resume <id> | --skip-scout --game "<co
 Execute the complete autonomous weekly game release workflow.
 
 **Arguments**: $ARGUMENTS
+
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
+
+**Pass the context down.** Every agent this command spawns (directly or through `weekly-release-orchestrator` / `add-game-orchestrator`) receives the resolved `Context: Weekly Arcade game <slug>` line in its dispatch prompt, so no sub-agent re-asks. A new game counts as Weekly Arcade because it is being added through this workflow.
+
+**Modular code is a standing rule** (`game-architecture` skill): the build is modular (WA: ES modules in `apps/web-astro/game-src/{slug}/` with a `main.js` entry, bundled by `node scripts/build-games.mjs` into the generated, committed `public/games/{slug}/game.js`; if `scripts/build-games.mjs` is missing from the checkout, internal modules inside a single hand-written IIFE `game.js`, and tell the user). Every fix in every phase edits `game-src/{slug}/` and reruns `node scripts/build-games.mjs --game {slug}`; the generated `game.js` is never hand-edited. The code review gate scores it (god files and game logic inside UI are HIGH findings).
 
 ## Overview
 
@@ -49,8 +57,8 @@ This command orchestrates the entire weekly game release by coordinating:
 /weekly-game-release [options]
 
 Options:
-  --dry-run              Preview all operations without executing
-  --execute              Execute workflow (default behavior)
+  (no flag)              Execute the workflow (DEFAULT)
+  --dry-run              Show the full plan and change nothing
   --resume <id>          Resume failed workflow from checkpoint
   --skip-scout           Skip scouting, use provided concept
   --game "<concept>"     Game concept (requires --skip-scout)
@@ -58,19 +66,23 @@ Options:
   --verbose              Show detailed progress logs
 ```
 
+The workflow executes by default; `--dry-run` previews it. Executing by default does not skip
+any safety step: pushing, modifying integration files, security fixes, rollback and merging
+each still ask for confirmation at that moment.
+
 ## Usage Examples
 
-### Standard Release (Recommended First Run)
+### Standard Release
+```
+/weekly-game-release
+```
+Run the full autonomous workflow.
+
+### Dry Run (preview first)
 ```
 /weekly-game-release --dry-run
 ```
-Preview the entire workflow, then execute with `--execute`.
-
-### Execute Release
-```
-/weekly-game-release --execute
-```
-Run the full autonomous workflow.
+Show the entire plan without changing anything, then run `/weekly-game-release` to execute.
 
 ### With Specific Game Concept
 ```
@@ -89,6 +101,32 @@ Continue from the last successful phase.
 /weekly-game-release --no-merge
 ```
 Stop after PR creation for manual review.
+
+## Creative Tooling (mockups and asset generation)
+
+**Mockups come before the build.** The visual design phase uses the Claude Design MCP
+(`mcp__claude-design__*`): read its design skill and prompt, pick the design system, create the
+project, build a mockup for every screen, render every screen at every breakpoint, finalize. If
+the claude-design MCP is not connected, say so and ask the user to run `/design-login` and retry,
+or to approve skipping the phase; never skip it silently. A skip is recorded with the user's
+approval in workflow state and the PR body.
+
+**Asset generation.** The rules, costs, cleanup pipeline and licensing live in the
+`game-environment-art` skill and its `references/generative-tooling.md` and
+`references/blender-pipeline.md`; follow them, do not restate them. In short:
+
+| Asset | Tool | Notes |
+|-------|------|-------|
+| 2D images, textures, UI art, icons, key art, reference boards | Nano Banana Pro via the `nano-banana` skill (gemini CLI) | No text baked into images; style-lock per the reference |
+| 3D models | Meshy AI (`meshy-7`) via its API (`~/meshy-eval`) | Verify the key is present without printing it; never copy it into a repo |
+| 3D cleanup, retopology / decimation, rig and animation retargeting, export | Blender via the `blender` MCP (live tools need GUI Blender; `*_for_cli` variants run background Blender) | glTF / GLB for web engines; `.glb` (or `.blend`) import for Godot |
+| Anything else | Name the tool and get user approval before using it | |
+
+- Procedural code and CC0 libraries come first when they fit (preference order in the skill).
+- **Every credit-spending call** (Meshy, image generation) gets a cost estimate first (number of
+  generations and credits) and user approval before it runs.
+- **Every asset gets a license record** (source, prompt or URL, date, license). Meshy free tier is
+  CC BY 4.0 and needs attribution; paid plans are private.
 
 ---
 
@@ -114,6 +152,11 @@ npm install && npm run build              # Must succeed
 # Permissions
 gh auth status                            # Must be authenticated
 ```
+
+Then run the `game-toolchain` skill for this release (git, gh, node / npm, browser + chrome-devtools
+MCP, Babylon / Phaser packages if the PRD needs them, claude-design MCP, nano-banana + gemini,
+Meshy key present, Blender + `blender` MCP). Missing items are installed only after the user
+says yes, then re-verified.
 
 If any check fails, abort before making changes.
 
@@ -158,6 +201,23 @@ it is built.** Without it `game-builder` invents the visual language while it is
 solving game logic, which is where inconsistent palettes, desktop-only layouts and
 "designed at 1440px, unplayable at 390px" come from. Discovering that in Phase 5 (Visual
 QA) means rebuilding rendering code that already works.
+
+#### Themed game UI (non-negotiable)
+
+Every menu, HUD, button, pop-up / modal, toast, card, tooltip, settings panel, results /
+game-over screen, shop and leaderboard panel is designed as an object from the game's own world
+(a laminated notice, a carved wooden sign, a neon arcade plate, a ship console), with material
+texture, borders or frames, depth, wear, and themed button states (idle, hover, pressed,
+disabled). Typography and iconography match the theme.
+
+- Not acceptable: flat web UI (plain rounded rectangles, default system fonts, generic
+  Bootstrap / Material-looking buttons and modals, browser-default controls).
+- Claude Design mockups show every UI state in the themed style at every breakpoint.
+- The visual tester and the code reviewer fail a screen that reads as web UI (HIGH finding).
+- Readable and accessible first: contrast and touch targets per `mobile-game-ux` and
+  `game-accessibility`. Theming never overrides legibility.
+- Weekly Arcade: the repo CLAUDE.md "Adding a New Game" section already carries this rule; the
+  plugin now enforces it in the workflow too.
 
 ```yaml
 Tooling: Claude Design MCP (mcp__claude-design__*)
@@ -205,6 +265,10 @@ Validation (ALL must pass before Phase 3 starts):
   - themeColor and accentColor are distinct values, each chosen on purpose
   - Design finalized via finalize_plan (not left as a draft)
 ```
+
+**If the claude-design MCP is not connected:** say so and ask the user to run `/design-login`
+and retry, or to approve skipping this phase. Never skip it silently; record an approved skip in
+the workflow state and the PR body.
 
 **Gate: do not start Phase 3 until `finalize_plan` has been called.** A half-finished
 design is worse than none — Phase 3 will follow it partway and improvise the rest.
@@ -279,6 +343,8 @@ Inputs (BOTH required):
             + design project URL from workflow state
   Design governs appearance (palette, layout, spacing, CSS art, responsive).
   PRD governs mechanics. Neither is to be re-invented by game-builder.
+  Themed game UI (non-negotiable, Phase 2.5): every UI element is built as the themed object
+  the mockups show, with all button states; no flat web UI.
 
 MANDATORY Sub-Agents (all must complete):
   - game-builder: Creates game files
@@ -398,6 +464,7 @@ Agent: game-code-reviewer
 Max Iterations: 3
 Pass Threshold: 20/30
 Borderline Accept: 15/30 (after 3 iterations)
+Themed game UI: UI built as flat web UI (Phase 2.5 rule) is a HIGH finding
 
 Per Iteration:
   1. Run code review
@@ -425,6 +492,9 @@ Steps:
      - Screenshot all game states
      - Verify touch targets >= 44px, no horizontal scroll
      - Check safe area / notch handling
+  3b. Themed game UI (Phase 2.5 rule): every menu, HUD, button, pop-up, toast, panel and
+     results screen reads as a themed game object with themed button states; a screen that
+     reads as web UI is a HIGH issue
   4. Responsive breakpoints (320, 375, 414, 768, 1024, 1920):
      - Screenshot each width
      - Flag layout jumps, overlapping elements, truncated text
@@ -464,8 +534,8 @@ Per Iteration:
   2. Categorize bugs by severity
 
   CRITICAL/HIGH bugs:
-    - Fix immediately
-    - Commit and re-test
+    - Fix immediately (in game-src/{slug}/, then node scripts/build-games.mjs --game {slug})
+    - Commit source + regenerated game.js and re-test
 
   MEDIUM/LOW bugs:
     - Create GitHub issue (deferred)
@@ -492,7 +562,9 @@ longer it is good.
 
 Run it here, after CRITICAL/HIGH bugs are fixed, because the sweep has to be
 able to drive the game end to end. Run it again after any Phase 7-9 fix that
-touches `game.js`.
+touches the game's code (`game-src/{slug}/` and the regenerated `game.js`). The
+sweep's runtime probes still target the served `public/games/{slug}/game.js`;
+fixes go in the source.
 
 ```yaml
 Skill: state-sweep
@@ -617,12 +689,15 @@ MEDIUM/LOW issues:
 Agent: game-integration-checker
 
 MANDATORY — run this even if Phase 3 integration checker passed.
-Phases 4-9 often modify game.js, styles.css, and game-config.ts,
+Phases 4-9 often modify game-src/{slug}/ (and so the generated game.js),
+styles.css, and game-config.ts,
 which can break metadata key alignment, score validation, or
 achievement references.
 
 Checks (all must pass before PR):
-  - All game files exist (page, JS, CSS, data JSON, thumbnail)
+  - All game files exist (page, game-src/{slug}/main.js, generated JS, CSS, data JSON, thumbnail)
+  - game.js carries the GENERATED banner and `node scripts/build-games.mjs --check` passes
+    (skipped only in the single-IIFE fallback, which the PR description must say)
   - Game appears on homepage (hero + card at position 0)
   - Game appears on /games/ index (card at position 0)
   - Game appears on matching category pages
@@ -630,7 +705,7 @@ Checks (all must pass before PR):
   - GAME_REGISTRY entry exists with correct id
   - All achievements registered in achievements.ts
   - GAME_SLUG in AchievementCategory type union
-  - game-config.ts metadata keys match game.js submitScore calls
+  - game-config.ts metadata keys match the submitScore calls in game-src/{slug}/
   - SVG thumbnail exists
   - Build passes (shared + api + web-astro)
 
@@ -702,12 +777,12 @@ See `orchestrator-guardrails` skill for complete rules.
 
 ---
 
-## Dry-Run Output
+## Dry Run Output
 
 When using `--dry-run`, the orchestrator simulates all phases and outputs:
 
 ```
-## Dry-Run Summary
+## Dry Run Summary
 
 ### Phase Results
 | Phase | Status | Key Output |
@@ -745,7 +820,7 @@ When using `--dry-run`, the orchestrator simulates all phases and outputs:
 2. Create issues for deferred bugs
 
 ---
-To execute: /weekly-game-release --execute
+To execute: /weekly-game-release (same flags, without --dry-run)
 ```
 
 ---

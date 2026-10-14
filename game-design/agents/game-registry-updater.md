@@ -8,6 +8,10 @@ model: sonnet
 
 You update the shared TypeScript packages to register a new game in the Weekly Arcade backend.
 
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
+
 ## Required Input
 
 You receive: GAME_NAME, GAME_SLUG, GAME_EMOJI, GAME_DESC, GAME_GENRE, and ACHIEVEMENTS array.

@@ -1,6 +1,6 @@
 ---
 description: Safely archive and retire an old game without breaking links or losing data
-argument-hint: <game-slug> [--archive | --hide | --redirect <new-game>]
+argument-hint: '<game-slug> [--archive | --hide | --redirect <new-game>] [--dry-run]'
 ---
 
 # Game Retire
@@ -8,6 +8,10 @@ argument-hint: <game-slug> [--archive | --hide | --redirect <new-game>]
 Safely sunset a game while preserving data and avoiding broken links.
 
 **Arguments**: $ARGUMENTS
+
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
 
 ## Overview
 
@@ -44,7 +48,8 @@ Options:
   --delete-leaderboard     Remove leaderboard data (dangerous)
   --reason "<text>"        Retirement reason (for records)
   --effective <date>       Schedule retirement for future date
-  --dry-run                Preview changes
+  --dry-run                Show the full plan and change nothing (default: execute;
+                           confirmations still ask at each step)
 ```
 
 ## Usage Examples

@@ -13,6 +13,10 @@ Always include `@media (prefers-reduced-motion: reduce)` to disable animations.
 
 ---
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Essential Game Animations
 
 ### 1. Pop/Bounce (Score, Collect)

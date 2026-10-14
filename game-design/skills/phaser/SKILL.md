@@ -11,6 +11,10 @@ description: >
 
 # Phaser 3 for Browser Games
 
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
+
 ## When to Use Phaser vs Vanilla Canvas
 
 | Feature Needed | Vanilla Canvas | Phaser |
@@ -28,7 +32,9 @@ description: >
 
 ---
 
-## Setup for Weekly Arcade (Astro)
+## Setup for Weekly Arcade (Astro) (WA only)
+
+Standalone games load Phaser from npm or their own bundler setup instead.
 
 ### CDN Loading (recommended for arcade — no build step)
 
@@ -43,6 +49,12 @@ description: >
   <script is:inline src="/games/{game-slug}/game.js"></script>
 </Fragment>
 ```
+
+For a new WA game, `/games/{game-slug}/game.js` is the generated bundle of
+`apps/web-astro/game-src/{game-slug}/` (built by `node scripts/build-games.mjs`; see
+`add-new-game`). Phaser stays the CDN global `window.Phaser`, read from the source modules: put
+the config below in `main.js` (without the IIFE wrapper, which the bundler adds) and each Scene in
+its own module. Existing Phaser games keep their current structure.
 
 ### Game Config Template
 
@@ -139,7 +151,7 @@ class GameOverScene extends Phaser.Scene {
     this.add.text(400, 200, 'Game Over', { fontSize: '64px', fill: '#fff' }).setOrigin(0.5);
     this.add.text(400, 300, `Score: ${score}`, { fontSize: '32px', fill: '#ccc' }).setOrigin(0.5);
 
-    // Submit to Weekly Arcade leaderboard
+    // (WA only) Submit to Weekly Arcade leaderboard; standalone games use their own backend or skip this
     if (window.gameCloud) {
       window.gameCloud.submitOrQueue('my-game', { score, level: 1, timeMs: Date.now() - this.registry.get('startTime') });
     }
@@ -432,7 +444,9 @@ const fire = this.add.particles(400, 500, 'particle', {
 
 ---
 
-## Weekly Arcade Integration
+## Weekly Arcade Integration (WA only)
+
+Skip this section for standalone games; wire score, auth and save to the game's own backend, if any.
 
 ```javascript
 // In GameOverScene.create():

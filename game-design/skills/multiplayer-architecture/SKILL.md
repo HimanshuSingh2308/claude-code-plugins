@@ -10,9 +10,13 @@ description: >
 
 # Multiplayer Architecture for Browser Games
 
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
+
 ## Architecture Overview
 
-Weekly Arcade uses a **two-service architecture** for multiplayer:
+(WA only) Weekly Arcade uses a **two-service architecture** for multiplayer. A standalone game uses its own backend; the server-authoritative concepts below still apply.
 
 ```
 Browser                          Backend
@@ -183,7 +187,7 @@ N-player: average pairwise changes.
 | Reconnect window expires | 2 min timer | Remove from session, host migrates if needed |
 | All players leave | Room empty check | Schedule 5-min eviction from memory |
 
-## MultiplayerConfig in Game Registry
+## MultiplayerConfig in Game Registry (WA only)
 
 ```typescript
 // In game-registry.ts — add to your game entry
@@ -220,7 +224,7 @@ multiplayer: {
 | Server tick rate | On-demand (per move) | Fixed (e.g., 10-60Hz) |
 | Examples | Chess, cards, board games | Racing, Snake, real-time puzzle |
 
-## File Locations
+## File Locations (WA only)
 
 | Component | Path |
 |-----------|------|

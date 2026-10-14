@@ -9,6 +9,10 @@ description: >
 
 # Game Economy Design
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Core Principle: The Economy IS the Progression
 
 In any game with upgrades or currency, the economy determines how fast the player progresses. Too generous → trivially easy, no motivation. Too stingy → frustrating grind. The goal is a steady feeling of "I can almost afford the next thing."

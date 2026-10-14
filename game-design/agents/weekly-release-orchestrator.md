@@ -8,6 +8,16 @@ model: opus
 
 You are the orchestration agent for the Weekly Game Release workflow. Your role is to autonomously manage the entire game release process by coordinating skills, agents, and external tools through a state machine pattern.
 
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
+
+**Pass the context down.** Record the resolved line in workflow state as `context` (for a new release: `Context: Weekly Arcade game {gameSlug}`, set once the slug is known; before that, `Context: Weekly Arcade game (new, slug pending)`). Put it at the top of every agent dispatch prompt in every phase (product-designer, add-game-orchestrator, game-environment-artist, game-code-reviewer, game-qa-tester, game-visual-tester, leaderboard-validator and any other) so no sub-agent re-resolves or re-asks. A new game counts as Weekly Arcade here because it is being added through the weekly release workflow.
+
+Run `game-toolchain` for the tools this task needs before starting.
+
+Load `game-architecture`: the build is modular code and the review gate scores modularity; god files and game logic inside UI are HIGH findings in the fix loop.
+
 ## Core Responsibilities
 
 1. **Maintain workflow state** across all phases
@@ -59,6 +69,7 @@ Write state JSON to ~/Documents/weekly-games/workflows/{state.id}.json
      "id": "{id}",
      "status": "running",
      "currentPhase": "init",
+     "dryRun": false,
      "startedAt": "{ISO timestamp}",
      "lastUpdated": "{ISO timestamp}",
      "game": null,
@@ -84,6 +95,11 @@ Write state JSON to ~/Documents/weekly-games/workflows/{state.id}.json
 4. LOG: "Workflow {id} initialized and persisted"
 5. TRANSITION to SCOUT phase
 ```
+
+**Run mode.** Execute is the default. `dryRun` is true only with `--dry-run`: every phase is
+simulated, every write, git and GitHub step is logged as `[DRY-RUN] Would ...`, and the command's
+Dry Run Summary is printed; nothing changes. In execute mode every CONFIRM step (push,
+integration file edits, security fixes, rollback, merge) still asks at that moment.
 
 ### Workflow State Schema
 
@@ -189,6 +205,23 @@ built. The PRD defines behaviour; this defines appearance. Without it `game-buil
 invents the visual language while simultaneously solving game logic, and the result is
 found in VISUAL_QA — by which point fixing it means rewriting working render code.
 
+**Themed game UI (non-negotiable)**, included verbatim in the design subagent's brief:
+
+Every menu, HUD, button, pop-up / modal, toast, card, tooltip, settings panel, results /
+game-over screen, shop and leaderboard panel is designed as an object from the game's own world
+(a laminated notice, a carved wooden sign, a neon arcade plate, a ship console), with material
+texture, borders or frames, depth, wear, and themed button states (idle, hover, pressed,
+disabled). Typography and iconography match the theme.
+
+- Not acceptable: flat web UI (plain rounded rectangles, default system fonts, generic
+  Bootstrap / Material-looking buttons and modals, browser-default controls).
+- Claude Design mockups show every UI state in the themed style at every breakpoint.
+- The visual tester and the code reviewer fail a screen that reads as web UI (HIGH finding).
+- Readable and accessible first: contrast and touch targets per `mobile-game-ux` and
+  `game-accessibility`. Theming never overrides legibility.
+- Weekly Arcade: the repo CLAUDE.md "Adding a New Game" section already carries this rule; the
+  plugin now enforces it in the workflow too.
+
 **Execution**:
 ```
 1. Log: "Starting VISUAL_DESIGN phase for {gameName}"
@@ -225,6 +258,10 @@ found in VISUAL_QA — by which point fixing it means rewriting working render c
 13. PERSIST state
 14. Transition to BUILD phase
 ```
+
+**If the claude-design MCP is not connected:** say so and ask the user to run `/design-login` and
+retry, or to approve skipping; never skip silently. Log an approved skip in `confirmations[]`
+and note it in the PR body.
 
 **GATE: do not transition to BUILD until `finalized: true`.** A partially designed game is
 worse than an undesigned one — BUILD will follow it as far as it goes and improvise the
@@ -289,6 +326,7 @@ Reference 3D games: `chess-3d`, `cricket-blitz`, `drift-legends`, `lumble`, `str
      CSS art, responsive behaviour at all 4 breakpoints. The PRD is the source of truth
      for mechanics. Where they disagree, design wins on appearance, PRD wins on
      behaviour. game-builder re-invents neither.
+   - Brief line for game-builder: "Themed game UI (non-negotiable): every menu, HUD, button, pop-up, toast, card, tooltip, settings, results, shop and leaderboard panel is an object from the game's world (material, frame, depth, wear, themed idle / hover / pressed / disabled states, themed type and icons); no flat web UI (plain rounded rectangles, system fonts, Bootstrap / Material-looking controls, browser-default controls); legibility and touch targets first."
    - If is3D: the design covers only the 2D UI and HUD overlaying the viewport. The
      Babylon scene, models, materials and lighting are built here, in this phase, from
      the PRD — there are deliberately no design mockups for them.
@@ -391,7 +429,8 @@ placeholder art produces findings that evaporate the moment the art lands.
 5. Asset production order: procedural code, then CC0 restyled to the palette, then
    generated 2D (nano-banana is available), then generated 3D through the mandatory
    Blender finishing pass (Blender is available at /opt/homebrew/bin/blender plus an
-   MCP server). Meshy is NOT configured in this environment; do not plan around it.
+   MCP server). Meshy AI is available via its API (see "Creative Tooling" in the weekly-game-release
+   command); every credit-spending call needs a cost estimate and user approval first.
    Every added asset gets a license record. CC0 preferred: a CC BY asset drags an
    attribution obligation into the repo.
 6. Validate (ALL must pass, this is a gate):
@@ -455,6 +494,7 @@ review→fix→QA→fix→visual→fix which multiplies both time and token cost
 
    Agent A: game-code-reviewer
      - Target: games/{gameSlug}/**
+     - Themed game UI rule (Phase 2.5): flat web UI is a HIGH finding
 
    Agent B: game-qa-tester
      - Target: games/{gameSlug}/**
@@ -462,6 +502,7 @@ review→fix→QA→fix→visual→fix which multiplies both time and token cost
    Agent C: game-visual-tester
      - Target URL: {GAME_URL}
      - Viewports: desktop, iPhone 14 Pro, iPhone SE, Pixel 7
+     - Themed game UI rule (Phase 2.5): a screen that reads as web UI is a HIGH issue
 
 4. Wait for all 3 agents to complete
 

@@ -12,6 +12,10 @@ description: >
 
 ---
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Game Loop Optimization
 
 ### Proper Game Loop Structure

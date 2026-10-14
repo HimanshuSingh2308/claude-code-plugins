@@ -35,6 +35,10 @@ Act from this file. Open a reference when you need the long table or the recipe.
 
 ---
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## 1. The performance model, because it reframes every art decision
 
 ### 1.1 You are not triangle-bound. You are draw-call and bandwidth-bound.
@@ -739,8 +743,8 @@ survive to a commit.
 | Tool | Status |
 |---|---|
 | **Nano Banana (Gemini image)** | **Available now.** The `gemini` CLI is on PATH and a `nano-banana` skill drives it |
-| **Blender** | **Available now.** CLI at `/opt/homebrew/bin/blender`, plus a Blender MCP server, so Blender can be scripted directly |
-| **Meshy AI** | **NOT configured.** No API key, no MCP, no reference in settings or this repo. Requires setup before any use |
+| **Blender** | **Available now.** CLI at `/opt/homebrew/bin/blender`, plus the `blender` MCP server (live tools need GUI Blender; `*_for_cli` variants run background Blender) |
+| **Meshy AI** | **Available via API** (`meshy-7`, set up in `~/meshy-eval`, details in [references/generative-tooling.md](references/generative-tooling.md)). Verify the key is present without printing it; never copy it into a repo. Spends credits: estimate count and credits and get approval first. Free tier output is CC BY 4.0 |
 
 **Order of preference for producing any asset:** (1) **procedural code** (Babylon mesh builders,
 canvas textures, Blender Python), which is free, diffable, parameterisable and exactly on budget,

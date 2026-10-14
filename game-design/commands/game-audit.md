@@ -9,6 +9,10 @@ Run all quality agents on an existing game to assess its health and identify iss
 
 **Arguments**: $ARGUMENTS
 
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
+
 ## Overview
 
 This command runs a comprehensive audit by invoking all quality agents:
@@ -106,6 +110,8 @@ Options:
 
 ### Step 1: Validate Game Exists
 
+Resolve `game-context` first and state the `Context:` line. The paths below are WA paths (WA only); for a standalone game, validate and read the game's own entry files in its own repo instead.
+
 ```bash
 # Check game folder exists
 ls apps/web-astro/src/pages/games/{game-slug}.astro
@@ -124,10 +130,10 @@ Purpose: Read all game files ONCE upfront and share the parsed context across al
 Files to read:
   - apps/web-astro/src/pages/games/{game-slug}.astro     (game page)
   - apps/web-astro/src/data/games/{game-slug}.json      (game metadata)
-  - apps/web-astro/src/pages/index.astro                (integration check)
-  - apps/web-astro/src/pages/leaderboard.astro          (leaderboard integration)
+  - apps/web-astro/src/pages/index.astro                (integration check) (WA only)
+  - apps/web-astro/src/pages/leaderboard.astro          (leaderboard integration) (WA only)
 
-Store: game_context = { sourceFiles, htmlContent, fileCount, hasEconomy, hasLeaderboard }
+Store: game_files = { sourceFiles, htmlContent, fileCount, hasEconomy, hasLeaderboard }
 ```
 
 ### Step 3: Run ALL Agents in Parallel
@@ -136,41 +142,49 @@ Store: game_context = { sourceFiles, htmlContent, fileCount, hasEconomy, hasLead
 Each agent is independent — they read the same game files and produce separate reports.
 Running them sequentially wastes ~80% of the audit time.
 
+Every dispatch prompt MUST include the resolved `Context:` line (the `context:` field below) so no sub-agent re-asks. For a standalone game, `target` is the game's own entry file, and the WA-specific checks inside each agent are skipped.
+
 ```yaml
 # Launch ALL of these agents in a SINGLE message with parallel tool calls:
 
 Agent 1 - Code Review:
   agent: game-code-reviewer
+  context: "{resolved Context: line from game-context}"
   target: apps/web-astro/src/pages/games/{game-slug}.astro**
   knowledge: game-balancing, performance-tuning
   output: Overall score (/30), issues by category, improvement suggestions
 
 Agent 2 - Visual QA:
   agent: game-visual-tester
+  context: "{resolved Context: line from game-context}"
   target: apps/web-astro/src/pages/games/{game-slug}.astro
   knowledge: mobile-game-ux
   output: Viewport pass/fail matrix, Lighthouse scores, console errors
 
 Agent 3 - Functional QA:
   agent: game-qa-tester
+  context: "{resolved Context: line from game-context}"
   target: apps/web-astro/src/pages/games/{game-slug}.astro**
   knowledge: playtesting
   output: Bugs by severity, UX issues, mobile compatibility
 
 Agent 4 - Accessibility Audit:
   agent: game-accessibility-auditor
+  context: "{resolved Context: line from game-context}"
   target: apps/web-astro/src/pages/games/{game-slug}.astro
   knowledge: game-accessibility
   output: Accessibility score (/65), WCAG compliance, issues by severity
 
 Agent 5 - Economy Validation (skip if no economy system):
   agent: game-economy-validator
+  context: "{resolved Context: line from game-context}"
   target: apps/web-astro/src/pages/games/{game-slug}.astro
   knowledge: game-balancing, economy-design
   output: Economy health, dead zone warnings, balance recommendations
 
 Agent 6 - Security Validation:
   agent: leaderboard-validator
+  context: "{resolved Context: line from game-context}"
   target: apps/web-astro/src/pages/games/{game-slug}.astro**
   output: Security assessment, vulnerabilities, anti-cheat evaluation
 ```
@@ -414,14 +428,14 @@ When multiple game slugs are provided, run audits in parallel for maximum effici
 ### Batch Workflow
 
 ```
-1. Validate all game slugs exist:
+1. Resolve `game-context` per slug (each game gets its own `Context:` line; ask once for any that cannot be resolved), then validate all game slugs exist:
    FOR slug IN game_slugs (PARALLEL):
      ls apps/web-astro/src/pages/games/{slug}/
    IF any missing: report and continue with valid ones
 
 2. Read all game files upfront (PARALLEL):
    FOR slug IN valid_slugs (PARALLEL):
-     game_contexts[slug] = read(apps/web-astro/src/pages/games/{slug}.astro, apps/web-astro/src/data/games/{slug}.json)
+     game_files[slug] = read(apps/web-astro/src/pages/games/{slug}.astro, apps/web-astro/src/data/games/{slug}.json)
 
 3. Launch all audits in PARALLEL:
    # For N games × 6 agents = 6N agent calls, but organized as N parallel audit groups

@@ -19,6 +19,14 @@ rule you apply comes from there. Do not re-derive them and do not invent new one
 
 ---
 
+## Step 0: Game context
+
+Load `game-context` first. WA-specific steps below are marked (WA only); skip them for standalone games.
+
+Run `game-toolchain` for the tools this task needs before starting.
+
+Load `game-architecture`: world building, props, palette constants and lighting live in their own world-layer modules (Godot: their own scenes and Resources), never inside gameplay or UI code.
+
 ## Non-negotiables
 
 - **Never assert performance. Measure it.** "This should be fine" is not an output. Draw calls,
@@ -31,7 +39,7 @@ rule you apply comes from there. Do not re-derive them and do not invent new one
 - **Do not change gameplay.** You may move a mesh for composition only if its interaction hitbox
   stays exactly where it was. If an art change would alter what the player can hit, stop and
   report it rather than doing it.
-- **Do not touch other games**, `api-client.js`, `auth.js`, or any shared package. If the fix lives
+- **Do not touch other games**, `api-client.js`, `auth.js` (WA only), or any shared package. If the fix lives
   there, report it with the file and line and stop.
 - **Every third-party asset gets a license record.** CC0 preferred. A CC BY asset drags an
   attribution obligation into the repo; say so out loud before using one.
@@ -129,8 +137,10 @@ designed character, then hand modelling.
 - **Blender is available**: `/opt/homebrew/bin/blender` plus a Blender MCP server. Every foreign
   asset, generated or downloaded, goes through the same deterministic finishing script. That
   script, not careful prompting, is what makes a set look like one world.
-- **Meshy is not configured** in this environment. Do not plan around it. If a task genuinely needs
-  text-to-3D, say so and stop rather than improvising a substitute.
+- **Meshy AI is available via its API** (`meshy-7`, set up in `~/meshy-eval`, see the skill's
+  generative-tooling reference). Verify the key is present without printing it, never copy it into
+  a game repo, and estimate credits and get user approval before any generation call. Generated
+  3D always goes through the Blender finishing pass.
 
 Commit the cleanup script and the palette constants, not just the outputs. Sidecar every generated
 or downloaded asset with its source, prompt or URL, date and license.
@@ -238,7 +248,7 @@ PASS | PASS WITH DEFERRALS | BLOCKED
 
 - **A change would alter gameplay** (a hitbox, a collision shape, a spawn point): stop, report,
   do not do it.
-- **The fix lives in a blocked file** (`api-client.js`, `auth.js`, shared packages, another game):
+- **The fix lives in a blocked file** (`api-client.js` and `auth.js` (WA only), shared packages, another game):
   report the file and line, do not edit.
 - **A budget cannot be met without cutting something the PRD requires**: report the conflict with
   the measured numbers, propose the two cheapest alternatives, and let the caller decide.

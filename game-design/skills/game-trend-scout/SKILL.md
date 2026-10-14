@@ -22,6 +22,10 @@ Produces a ranked report with scored candidates and deep dives on the top 3.
 
 ---
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## When to use this skill
 
 - User names a genre or theme: "scout space war games", "find trending puzzle ideas"
@@ -111,7 +115,7 @@ For each of the top 3 scored concepts, write:
 
 **Browser gap:** What exists vs what's missing in the browser tier specifically.
 
-**Core loop for Weekly Arcade:** Bullet list: controls, objective, scoring, leaderboard hook.
+**Core loop for Weekly Arcade (WA only; for a standalone game, "Core loop"):** Bullet list: controls, objective, scoring, leaderboard hook.
 
 **Feasibility:** Plain language. "Canvas 2D, no libraries needed. Est. 5–7 days."
 
@@ -154,7 +158,9 @@ Use past scout reports as reference points:
 
 ---
 
-## Weekly Arcade Context
+## Weekly Arcade Context (WA only)
+
+Use this profile only when scouting for a Weekly Arcade release. For a standalone game, use the platform, audience and constraints the user gives.
 
 Games are built for `weeklyarcade.games` — a browser-first arcade with weekly new releases.
 Current library: Wordle, Snake, 2048, Chaos Kitchen, Memory Match, Lumble, Fieldstone, Voidbreak.

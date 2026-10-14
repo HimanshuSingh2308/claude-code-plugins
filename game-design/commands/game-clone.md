@@ -9,6 +9,10 @@ Clone an existing game as a starting point for a new game or variation.
 
 **Arguments**: $ARGUMENTS
 
+## Step 0: Game context
+
+Requires a Weekly Arcade game. Load `game-context` first; if the result is standalone, stop and tell the user this only works for Weekly Arcade games.
+
 ## Overview
 
 Use this command to:

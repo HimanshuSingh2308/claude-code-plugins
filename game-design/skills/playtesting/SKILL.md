@@ -9,6 +9,10 @@ description: >
 
 # Playtesting Framework
 
+## Step 0: Game context
+
+Applies to Weekly Arcade and standalone games; load `game-context` to know which platform rules (if any) apply.
+
 ## Core Principle: Play Your Own Game Like a Stranger
 
 The hardest part of playtesting is forgetting what you know. You built it, so you know every mechanic. A real player doesn't. Test with fresh eyes.
