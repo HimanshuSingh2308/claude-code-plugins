@@ -425,7 +425,7 @@ claude --plugin-dir ./game-design
 
 ## Version History
 
-### Unreleased
+### v2.37.0
 - Added `character-pipeline` skill (+6 references: concepts and Meshy, Blender build, animation library, checks and review, faces and feedback, Godot) - the route that built The Long Way to Success #113 characters and the traps hit there; gates: Meshy estimate and approval per batch, user approves every look from renders before push, gates only tighten, every check has a broken-copy proof, byte-identical rebuilds, angular anime faces with user-granted exceptions
 
 ### v2.36.0
