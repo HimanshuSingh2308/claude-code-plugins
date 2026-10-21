@@ -328,6 +328,7 @@ All commands enforce safety rules:
 - `/game-design:post-launch` - **NEW** Improvement funnel, signal detection, what to fix/add/cut
 - `/game-design:orchestrator-guardrails` - Safety rules for automated workflows
 - `/game-design:godot` - **NEW** Godot 4 the editor's way: official docs as source of truth, GDScript style guide, headless scene building, validation loop, native iOS / Android export, web export
+- `/game-design:character-pipeline` - **NEW** Stylised 3D characters end to end (anime / toon, low-poly, web budget): concept turnarounds, Meshy credit gate, Blender cleanup, shared skeleton with fingers, face and heel / toe, procedural hands, region-id palette, shared clips and the clip ceiling, checks with broken-copy proofs, byte-identical rebuilds, review page, anime face rule; Godot 4 engine side (other engines later)
 
 ---
 
@@ -423,6 +424,9 @@ claude --plugin-dir ./game-design
 ---
 
 ## Version History
+
+### v2.37.0
+- Added `character-pipeline` skill (+6 references: concepts and Meshy, Blender build, animation library, checks and review, faces and feedback, Godot) - the route that built The Long Way to Success #113 characters and the traps hit there; gates: Meshy estimate and approval per batch, user approves every look from renders before push, gates only tighten, every check has a broken-copy proof, byte-identical rebuilds, angular anime faces with user-granted exceptions
 
 ### v2.36.0
 - Added `godot` skill - Godot 4 development with the Godot editor and docs.godotengine.org (stable, 4.7.x) as the source of truth, no house conventions on top
