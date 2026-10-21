@@ -22,6 +22,8 @@ making that look intentional on a mid-range phone, in a browser, at 60 fps.
 Two audiences: a model acting mid-task, and a programmer who can drive Blender but has no
 formal art training. Art vocabulary is explained the first time it is used.
 
+Characters (bodies, rigs, clips, faces) are not covered here: load `character-pipeline`.
+
 Act from this file. Open a reference when you need the long table or the recipe.
 
 | Need | File |

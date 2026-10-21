@@ -43,6 +43,10 @@
     "godot",
     "gdscript",
     "godot-engine",
-    "mcp"
+    "mcp",
+    "characters",
+    "character-rigging",
+    "toon-shading",
+    "meshy"
   ]
 }
